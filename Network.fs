@@ -7,7 +7,10 @@ open type torch.nn
 let private maxInfoSetKeyLength = 3
 
 /// Length of a one-hot vector.
-let private oneHotLength = KuhnPoker.deck.Length
+let private oneHotLength =
+    max
+        KuhnPoker.actions.Length   // 2
+        KuhnPoker.deck.Length      // 3
 
 /// Length of neural network input.
 let private inputSize = maxInfoSetKeyLength * oneHotLength
@@ -33,13 +36,17 @@ let createStrategyNetwork hiddenSize =
 /// Encodes info set key as a vector.
 let encodeInput (infoSetKey : string) =
 
-    let toOneHot = function
-        | 'J' -> [| 1.0f; 0.0f; 0.0f |]
-        | 'K' -> [| 0.0f; 1.0f; 0.0f |]
-        | 'Q' -> [| 0.0f; 0.0f; 1.0f |]
-        | 'b' -> [| 1.0f; 0.0f; 0.0f |]
-        | 'c' -> [| 0.0f; 1.0f; 0.0f |]
-        | _ -> failwith "Unexpected"
+    let toOneHot c =
+        let oneHot =
+            match c with
+                | 'J' -> [| 1.0f; 0.0f; 0.0f |]
+                | 'K' -> [| 0.0f; 1.0f; 0.0f |]
+                | 'Q' -> [| 0.0f; 0.0f; 1.0f |]
+                | 'b' -> [| 1.0f; 0.0f; 0.0f |]
+                | 'c' -> [| 0.0f; 1.0f; 0.0f |]
+                | _ -> failwith "Unexpected"
+        assert(oneHot.Length = oneHotLength)
+        oneHot
 
     let encoded =
         [|

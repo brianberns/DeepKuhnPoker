@@ -242,7 +242,13 @@ let run () =
         j >= 0.0 && j <= 1.0/3.0            // bet frequency for a Jack should be between 0 and 1/3
             && abs((k / j) - 3.0) <= 0.1)   // bet frequency for a King should be three times a Jack
 
+(*
 let timer = Diagnostics.Stopwatch.StartNew()
 run ()
 printfn ""
 printfn $"Elapsed time: {timer}"
+*)
+
+let network = Network.createAdvantageNetwork 16
+for parm in network.parameters() do
+    printfn $"{parm.ToString(TorchSharp.TensorStringStyle.Default)}"
