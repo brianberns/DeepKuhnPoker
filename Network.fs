@@ -1,0 +1,52 @@
+﻿module Network
+
+open TorchSharp
+open type torch.nn
+
+/// Length of longest info set key. E.g. "Jcb".
+let private maxInfoSetKeyLength = 3
+
+/// Length of a one-hot vector.
+let private oneHotLength = KuhnPoker.deck.Length
+
+/// Length of neural network input.
+let private inputSize = maxInfoSetKeyLength * oneHotLength
+
+/// Length of neural network output.
+let private outputSize = KuhnPoker.actions.Length
+
+/// Advantage network.
+let createAdvantageNetwork hiddenSize =
+    Sequential(
+        Linear(inputSize, hiddenSize),
+        ReLU(),
+        Linear(hiddenSize, outputSize))
+
+/// Strategy network.
+let createStrategyNetwork hiddenSize =
+    Sequential(
+        Linear(inputSize, hiddenSize),
+        ReLU(),
+        Linear(hiddenSize, outputSize),
+        Softmax(dim = 1))
+
+/// Encodes info set key as a vector.
+let encodeInput (infoSetKey : string) =
+
+    let toOneHot = function
+        | 'J' -> [| 1.0f; 0.0f; 0.0f |]
+        | 'K' -> [| 0.0f; 1.0f; 0.0f |]
+        | 'Q' -> [| 0.0f; 0.0f; 1.0f |]
+        | 'b' -> [| 1.0f; 0.0f; 0.0f |]
+        | 'c' -> [| 0.0f; 1.0f; 0.0f |]
+        | _ -> failwith "Unexpected"
+
+    let encoded =
+        [|
+            for c in infoSetKey do
+                yield! toOneHot c
+            yield! Array.zeroCreate
+                (oneHotLength * (maxInfoSetKeyLength - infoSetKey.Length))
+        |]
+    assert(encoded.Length = inputSize)
+    encoded
