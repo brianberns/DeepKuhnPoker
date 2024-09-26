@@ -1,47 +1,49 @@
-﻿/// Kuhn poker
-module KuhnPoker
+﻿namespace DeepKuhnPoker
 
-/// Number of players.
-let numPlayers = 2
+/// Kuhn poker
+module KuhnPoker =
 
-/// Available player actions.
-let actions =
-    [|
-        "b"   // bet/call
-        "c"   // check/fold
-    |]
+    /// Number of players.
+    let numPlayers = 2
 
-/// Cards in the deck.
-let deck =
-    [
-        "J"   // Jack
-        "Q"   // Queen
-        "K"   // King
-    ]
+    /// Available player actions.
+    let actions =
+        [|
+            "b"   // bet/call
+            "c"   // check/fold
+        |]
 
-/// Gets zero-based index of active player.
-let getActivePlayer (history : string) =
-    history.Length % numPlayers
+    /// Cards in the deck.
+    let deck =
+        [
+            "J"   // Jack
+            "Q"   // Queen
+            "K"   // King
+        ]
 
-/// Gets payoff for the active player if the game is over.
-let getPayoff (cards : string[]) = function
+    /// Gets zero-based index of active player.
+    let getActivePlayer (history : string) =
+        history.Length % numPlayers
 
-        // opponent folds - active player wins
-    | "bc" | "cbc" -> Some 1
+    /// Gets payoff for the active player if the game is over.
+    let getPayoff (cards : string[]) = function
 
-        // showdown
-    | "cc" | "bb" | "cbb" as history ->
-        let payoff =
-            if history.Contains('b') then 2 else 1
-        let activePlayer = getActivePlayer history
-        let playerCard = cards[activePlayer]
-        let opponentCard =
-            cards[(activePlayer + 1) % numPlayers]
-        match playerCard, opponentCard with
-            | "K", _
-            | _, "J" -> payoff   // active player wins
-            | _ -> -payoff       // opponent wins
-            |> Some
+            // opponent folds - active player wins
+        | "bc" | "cbc" -> Some 1
 
-        // game not over
-    | _ -> None
+            // showdown
+        | "cc" | "bb" | "cbb" as history ->
+            let payoff =
+                if history.Contains('b') then 2 else 1
+            let activePlayer = getActivePlayer history
+            let playerCard = cards[activePlayer]
+            let opponentCard =
+                cards[(activePlayer + 1) % numPlayers]
+            match playerCard, opponentCard with
+                | "K", _
+                | _, "J" -> payoff   // active player wins
+                | _ -> -payoff       // opponent wins
+                |> Some
+
+            // game not over
+        | _ -> None

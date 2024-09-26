@@ -1,59 +1,61 @@
-﻿module Network
+﻿namespace DeepKuhnPoker
 
 open TorchSharp
 open type torch.nn
 
-/// Length of longest info set key. E.g. "Jcb".
-let private maxInfoSetKeyLength = 3
+module Network =
 
-/// Length of a one-hot vector.
-let private oneHotLength =
-    max
-        KuhnPoker.actions.Length   // 2
-        KuhnPoker.deck.Length      // 3
+    /// Length of longest info set key. E.g. "Jcb".
+    let private maxInfoSetKeyLength = 3
 
-/// Length of neural network input.
-let private inputSize = maxInfoSetKeyLength * oneHotLength
+    /// Length of a one-hot vector.
+    let private oneHotLength =
+        max
+            KuhnPoker.actions.Length   // 2
+            KuhnPoker.deck.Length      // 3
 
-/// Length of neural network output.
-let private outputSize = KuhnPoker.actions.Length
+    /// Length of neural network input.
+    let private inputSize = maxInfoSetKeyLength * oneHotLength
 
-/// Advantage network.
-let createAdvantageNetwork hiddenSize =
-    Sequential(
-        Linear(inputSize, hiddenSize),
-        ReLU(),
-        Linear(hiddenSize, outputSize))
+    /// Length of neural network output.
+    let private outputSize = KuhnPoker.actions.Length
 
-/// Strategy network.
-let createStrategyNetwork hiddenSize =
-    Sequential(
-        Linear(inputSize, hiddenSize),
-        ReLU(),
-        Linear(hiddenSize, outputSize),
-        Softmax(dim = 1))
+    /// Advantage network.
+    let createAdvantageNetwork hiddenSize =
+        Sequential(
+            Linear(inputSize, hiddenSize),
+            ReLU(),
+            Linear(hiddenSize, outputSize))
 
-/// Encodes info set key as a vector.
-let encodeInput (infoSetKey : string) =
+    /// Strategy network.
+    let createStrategyNetwork hiddenSize =
+        Sequential(
+            Linear(inputSize, hiddenSize),
+            ReLU(),
+            Linear(hiddenSize, outputSize),
+            Softmax(dim = 1))
 
-    let toOneHot c =
-        let oneHot =
-            match c with
-                | 'J' -> [| 1.0f; 0.0f; 0.0f |]
-                | 'K' -> [| 0.0f; 1.0f; 0.0f |]
-                | 'Q' -> [| 0.0f; 0.0f; 1.0f |]
-                | 'b' -> [| 1.0f; 0.0f; 0.0f |]
-                | 'c' -> [| 0.0f; 1.0f; 0.0f |]
-                | _ -> failwith "Unexpected"
-        assert(oneHot.Length = oneHotLength)
-        oneHot
+    /// Encodes info set key as a vector.
+    let encodeInput (infoSetKey : string) =
 
-    let encoded =
-        [|
-            for c in infoSetKey do
-                yield! toOneHot c
-            yield! Array.zeroCreate
-                (oneHotLength * (maxInfoSetKeyLength - infoSetKey.Length))
-        |]
-    assert(encoded.Length = inputSize)
-    encoded
+        let toOneHot c =
+            let oneHot =
+                match c with
+                    | 'J' -> [| 1.0f; 0.0f; 0.0f |]
+                    | 'K' -> [| 0.0f; 1.0f; 0.0f |]
+                    | 'Q' -> [| 0.0f; 0.0f; 1.0f |]
+                    | 'b' -> [| 1.0f; 0.0f; 0.0f |]
+                    | 'c' -> [| 0.0f; 1.0f; 0.0f |]
+                    | _ -> failwith "Unexpected"
+            assert(oneHot.Length = oneHotLength)
+            oneHot
+
+        let encoded =
+            [|
+                for c in infoSetKey do
+                    yield! toOneHot c
+                yield! Array.zeroCreate
+                    (oneHotLength * (maxInfoSetKeyLength - infoSetKey.Length))
+            |]
+        assert(encoded.Length = inputSize)
+        encoded

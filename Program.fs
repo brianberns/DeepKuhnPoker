@@ -1,4 +1,4 @@
-﻿module Program
+﻿namespace DeepKuhnPoker
 
 open System
 
@@ -209,49 +209,45 @@ module KuhnCfrTrainer =
             Seq.sum utilities / float numIterations
         utility, infoSetMap
 
-let run () =
+module Program =
 
-        // train
-    let numIterations = 500000
-    printfn $"Running Kuhn Poker Monte Carlo CFR for {numIterations} iterations\n"
-    let util, infoSetMap = KuhnCfrTrainer.train numIterations
+    let run () =
 
-        // expected overall utility
-    printfn $"Average game value for first player: %0.5f{util}\n"
-    assert(abs(util - -1.0/18.0) <= 0.02)
+            // train
+        let numIterations = 500000
+        printfn $"Running Kuhn Poker Monte Carlo CFR for {numIterations} iterations\n"
+        let util, infoSetMap = KuhnCfrTrainer.train numIterations
 
-        // strategy
-    printfn "Strategy:"
-    for (KeyValue(key, infoSet)) in infoSetMap do
-        let str =
-            let strategy =
-                InformationSet.getAverageStrategy infoSet
-            (strategy.ToArray(), KuhnPoker.actions)
-                ||> Array.map2 (fun prob action ->
-                    sprintf "%s: %0.5f" action prob)
-                |> String.concat ", "
-        printfn $"%-3s{key}:    {str}"
-    assert(
-        let betAction =
-            Array.IndexOf(KuhnPoker.actions, "b")
-        let prob key =
-            let strategy =
-                infoSetMap[key]
-                    |> InformationSet.getAverageStrategy
-            strategy[betAction]
-        let k = prob "K"
-        let j = prob "J"
-        j >= 0.0 && j <= 1.0/3.0            // bet frequency for a Jack should be between 0 and 1/3
-            && abs((k / j) - 3.0) <= 0.1)   // bet frequency for a King should be three times a Jack
+            // expected overall utility
+        printfn $"Average game value for first player: %0.5f{util}\n"
+        assert(abs(util - -1.0/18.0) <= 0.02)
 
-(*
-let timer = Diagnostics.Stopwatch.StartNew()
-run ()
-printfn ""
-printfn $"Elapsed time: {timer}"
-*)
+            // strategy
+        printfn "Strategy:"
+        for (KeyValue(key, infoSet)) in infoSetMap do
+            let str =
+                let strategy =
+                    InformationSet.getAverageStrategy infoSet
+                (strategy.ToArray(), KuhnPoker.actions)
+                    ||> Array.map2 (fun prob action ->
+                        sprintf "%s: %0.5f" action prob)
+                    |> String.concat ", "
+            printfn $"%-3s{key}:    {str}"
+        assert(
+            let betAction =
+                Array.IndexOf(KuhnPoker.actions, "b")
+            let prob key =
+                let strategy =
+                    infoSetMap[key]
+                        |> InformationSet.getAverageStrategy
+                strategy[betAction]
+            let k = prob "K"
+            let j = prob "J"
+            j >= 0.0 && j <= 1.0/3.0            // bet frequency for a Jack should be between 0 and 1/3
+                && abs((k / j) - 3.0) <= 0.1)   // bet frequency for a King should be three times a Jack
 
-let res = Reservoir.create (Random()) 8
-(res, seq { 'a' .. 'z' })
-    ||> Seq.fold (fun acc c -> Reservoir.add c acc)
-    |> printfn "%A"
+    let timer = Diagnostics.Stopwatch.StartNew()
+    run ()
+    printfn ""
+    printfn $"Elapsed time: {timer}"
+    
