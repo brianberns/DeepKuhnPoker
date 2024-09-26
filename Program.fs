@@ -5,6 +5,8 @@ open System
 open MathNet.Numerics.Distributions
 open MathNet.Numerics.LinearAlgebra
 
+open TorchSharp
+
 /// An information set is a set of nodes in a game tree that are
 /// indistinguishable for a given player. This type gathers regrets
 /// and strategies for an information set.
@@ -249,6 +251,7 @@ printfn ""
 printfn $"Elapsed time: {timer}"
 *)
 
-let network = Network.createAdvantageNetwork 16
-for parm in network.parameters() do
-    printfn $"{parm.ToString(TorchSharp.TensorStringStyle.Default)}"
+let res = Reservoir.create (Random()) 8
+(res, seq { 'a' .. 'z' })
+    ||> Seq.fold (fun acc c -> Reservoir.add c acc)
+    |> printfn "%A"
