@@ -7,27 +7,7 @@ open MathNet.Numerics.LinearAlgebra
 
 open TorchSharp
 
-/// An information set is a set of nodes in a game tree that are
-/// indistinguishable for a given player. This type gathers regrets
-/// and strategies for an information set.
-type InformationSet =
-    {
-        /// Sum of regrets accumulated so far by this info set.
-        RegretSum : Vector<float>
-
-        /// Sum of strategies accumulated so far by this info set.
-        StrategySum : Vector<float>
-    }
-
 module InformationSet =
-
-    /// Initial info set.
-    let zero =
-        let zero = DenseVector.zero KuhnPoker.actions.Length
-        {
-            RegretSum = zero
-            StrategySum = zero
-        }
 
     /// Uniform strategy: All actions have equal probability.
     let private uniformStrategy =
@@ -46,23 +26,11 @@ module InformationSet =
         if sum > 0.0 then strategy / sum
         else uniformStrategy
 
-    /// Computes regret-matching strategy from accumulated
-    /// regrets.
-    let getStrategy infoSet =
-        infoSet.RegretSum
+    /// Computes regret-matching strategy from given regrets.
+    let getStrategy regrets =
+        regrets
             |> Vector.map (max 0.0)   // clamp negative regrets
             |> normalize
-
-    /// Accumulates results.
-    let accumulate regrets strategy infoSet =
-        {
-            RegretSum = infoSet.RegretSum + regrets
-            StrategySum = infoSet.StrategySum + strategy
-        }
-
-    /// Computes average strategy from accumulated strateges.
-    let getAverageStrategy infoSet =
-        normalize infoSet.StrategySum
 
 module KuhnCfrTrainer =
 
@@ -90,20 +58,20 @@ module KuhnCfrTrainer =
             |> Seq.map (~-)
             |> DenseVector.ofSeq
 
-    /// Evaluates the utility of the given deal via external
-    /// sampling Monte Carlo counterfactual regret minimization.
-    let private cfr infoSetMap deal updatingPlayer =
+    let numTraversals = 40
 
-        /// Top-level CFR loop.
-        let rec loop history reachProbs =
+    let private traverse deal updatingPlayer =
+
+        /// Top-level loop.
+        let rec loop history =
             match KuhnPoker.getPayoff deal history with
                 | Some payoff ->
                     float payoff, Array.empty   // game is over
                 | None ->
-                    loopNonTerminal history reachProbs
+                    loopNonTerminal history
 
         /// Recurses for non-terminal game state.
-        and loopNonTerminal history reachProbs =
+        and loopNonTerminal history =
 
                 // get info set for current state from this player's point of view
             let activePlayer = KuhnPoker.getActivePlayer history
@@ -164,14 +132,13 @@ module KuhnCfrTrainer =
 
             utility, keyedInfoSets
 
-        [| 1.0; 1.0 |]
-            |> DenseVector.ofArray
-            |> loop ""
+        for _ = 1 to numTraversals do
+            loop "" |> ignore
 
     /// Trains for the given number of iterations.
     let train numIterations =
 
-        let utilities, infoSetMap =
+        let utilities, () =
 
                 // each iteration evaluates one possible deal
             let deals =
@@ -187,22 +154,15 @@ module KuhnCfrTrainer =
                         yield permutations[rng.Next(permutations.Length)]   // avoid bias
                 }
 
-                // start with no known info sets
-            (Map.empty, Seq.indexed deals)
-                ||> Seq.mapFold (fun infoSetMap (i, deal) ->
+            ((), Seq.indexed deals)
+                ||> Seq.mapFold (fun acc (i, deal) ->
 
                         // evaluate one game starting with this deal
-                    let utility, keyedInfoSets =
+                    let utility =
                         let updatingPlayer = i % KuhnPoker.numPlayers
-                        cfr infoSetMap deal updatingPlayer
+                        traverse deal updatingPlayer
 
-                        // update info sets
-                    let infoSetMap =
-                        (infoSetMap, keyedInfoSets)
-                            ||> Seq.fold (fun acc (key, infoSet) ->
-                                    Map.add key infoSet acc)
-
-                    utility, infoSetMap)
+                    utility, acc)
 
             // compute average utility per deal
         let utility =
