@@ -58,7 +58,18 @@ module KuhnCfrTrainer =
             |> Seq.map (~-)
             |> DenseVector.ofSeq
 
-    let numTraversals = 40
+    let private advantageNetwork = Network.createAdvantageNetwork 32
+
+    let private getStrategy infoSetKey =
+        use _ = torch.no_grad()   // use model.eval() instead?
+        (infoSetKey
+            |> Network.encodeInput
+            |> torch.tensor
+            |> advantageNetwork.forward)
+            .data<float32>()
+            .ToArray()
+
+    let private numTraversals = 40
 
     let private traverse deal updatingPlayer =
 
@@ -76,10 +87,9 @@ module KuhnCfrTrainer =
                 // get info set for current state from this player's point of view
             let activePlayer = KuhnPoker.getActivePlayer history
             let infoSetKey = deal[activePlayer] + history
-            let infoSet = getInfoSet infoSetKey infoSetMap
 
                 // get player's current strategy for this info set
-            let strategy = InformationSet.getStrategy infoSet
+            let strategy = getStrategy infoSetKey
 
                 // get utility of this info set
             let utility, keyedInfoSets =
