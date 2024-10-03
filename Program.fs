@@ -39,6 +39,13 @@ type AdvantageExperience =
         Iteration : int
     }
 
+type StrategyExperience =
+    {
+        InfoSetKey : string
+        Strategy : Vector<float32>
+        Iteration : int
+    }
+
 module KuhnCfrTrainer =
 
     /// Random number generator.
@@ -66,6 +73,8 @@ module KuhnCfrTrainer =
 
     let private advantageReservior = Reservoir.create rng 10000
 
+    let private strategyReservior = Reservoir.create rng 10000
+
     let private traverse deal updatingPlayer =
 
         /// Top-level loop.
@@ -87,7 +96,7 @@ module KuhnCfrTrainer =
             let strategy = getStrategy infoSetKey
 
                 // get utility of this info set
-            let utility, keyedInfoSets =
+            let utility, experiences =
 
                 if activePlayer = updatingPlayer then
 
@@ -107,7 +116,7 @@ module KuhnCfrTrainer =
                     let experiences =
                         [|
                             yield! experiences
-                            yield {
+                            yield Choice1Of2 {
                                 InfoSetKey = infoSetKey
                                 Regrets = actionUtilities - utility
                                 Iteration = -1
@@ -127,9 +136,20 @@ module KuhnCfrTrainer =
                             |> Array.get KuhnPoker.actions
                     let utility, experiences =
                         loop (history + action)
+
+                    let experiences =
+                        [|
+                            yield! experiences
+                            yield Choice2Of2 {
+                                InfoSetKey = infoSetKey
+                                Strategy = strategy
+                                Iteration = -1
+                            }
+                        |]
+
                     -utility, experiences
 
-            utility, keyedInfoSets
+            utility, experiences
 
         for _ = 1 to numTraversals do
             loop "" |> ignore
