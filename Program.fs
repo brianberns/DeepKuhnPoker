@@ -9,35 +9,42 @@ open TorchSharp
 
 module InformationSet =
 
-    open LanguagePrimitives
-
     /// Uniform strategy: All actions have equal probability.
     let private uniformStrategy =
         DenseVector.create
             KuhnPoker.actions.Length
-            (DivideByInt GenericOne (KuhnPoker.actions.Length))
+            (1.0f / float32 KuhnPoker.actions.Length)
 
     /// Normalizes a strategy such that its elements sum to
     /// 1.0 (to represent action probabilities).
     let private normalize strategy =
 
             // assume no negative values during normalization
-        assert(Vector.forall (fun x -> x >= GenericZero) strategy)
+        assert(Vector.forall (fun x -> x >= 0.0f) strategy)
 
         let sum = Vector.sum strategy
-        if sum > GenericZero then strategy / sum
+        if sum > 0.0f then strategy / sum
         else uniformStrategy
 
     /// Computes regret-matching strategy from given regrets.
     let getStrategy regrets =
         regrets
-            |> Vector.map (max GenericZero)   // clamp negative regrets
+            |> Vector.map (max 0.0f)   // clamp negative regrets
             |> normalize
+
+type AdvantageExperience =
+    {
+        InfoSetKey : string
+        Regrets : Vector<float32>
+        Iteration : int
+    }
 
 module KuhnCfrTrainer =
 
     /// Random number generator.
     let private rng = Random(0)
+
+    let private numTraversals = 40
 
     let private advantageNetwork = Network.createAdvantageNetwork 32
 
@@ -51,7 +58,13 @@ module KuhnCfrTrainer =
             |> DenseVector.ofSeq
             |> InformationSet.getStrategy
 
-    let private numTraversals = 40
+    /// Negates opponent's utilties (assuming a zero-zum game).
+    let private getActiveUtilities utilities =
+        utilities
+            |> Seq.map (~-)
+            |> DenseVector.ofSeq
+
+    let private advantageReservior = Reservoir.create rng 10000
 
     let private traverse deal updatingPlayer =
 
@@ -59,7 +72,7 @@ module KuhnCfrTrainer =
         let rec loop history =
             match KuhnPoker.getPayoff deal history with
                 | Some payoff ->
-                    float payoff, Array.empty   // game is over
+                    float32 payoff, Array.empty   // game is over
                 | None ->
                     loopNonTerminal history
 
@@ -79,48 +92,42 @@ module KuhnCfrTrainer =
                 if activePlayer = updatingPlayer then
 
                         // get utility of each action
-                    let actionUtilities, keyedInfoSets =
-                        let utilities, keyedInfoSetArrays =
-                            (KuhnPoker.actions, strategy.ToArray())
-                                ||> Array.map2 (fun action actionProb ->
-                                    let reachProbs =
-                                        updateReachProbabilities
-                                            reachProbs
-                                            activePlayer
-                                            actionProb
-                                    loop (history + action) reachProbs)
+                    let actionUtilities, experiences =
+                        let utilities, experienceArrays =
+                            KuhnPoker.actions
+                                |> Array.map (fun action ->
+                                    loop (history + action))
                                 |> Array.unzip
                         getActiveUtilities utilities,
-                        Array.concat keyedInfoSetArrays
+                        Array.concat experienceArrays
 
                         // utility of this info set is action utilities weighted by action probabilities
                     let utility = actionUtilities * strategy
 
-                        // accumulate updated regrets and strategy
-                    let keyedInfoSets =
-                        let infoSet =
-                            let regrets =
-                                let opponent =
-                                    (activePlayer + 1) % KuhnPoker.numPlayers
-                                reachProbs[opponent] * (actionUtilities - utility)
-                            let strategy =
-                                reachProbs[activePlayer] * strategy
-                            InformationSet.accumulate regrets strategy infoSet
+                    let experiences =
                         [|
-                            yield! keyedInfoSets
-                            yield infoSetKey, infoSet
+                            yield! experiences
+                            yield {
+                                InfoSetKey = infoSetKey
+                                Regrets = actionUtilities - utility
+                                Iteration = -1
+                            }
                         |]
 
-                    utility, keyedInfoSets
+                    utility, experiences
 
                 else
                         // sample a single action according to the strategy
                     let action =
-                        Categorical.Sample(rng, strategy.ToArray())
+                        let strategy' =
+                            strategy
+                                |> Seq.map float   // ugly
+                                |> Seq.toArray
+                        Categorical.Sample(rng, strategy')
                             |> Array.get KuhnPoker.actions
-                    let utility, keyedInfoSets =
-                        loop (history + action) reachProbs
-                    -utility, keyedInfoSets
+                    let utility, experiences =
+                        loop (history + action)
+                    -utility, experiences
 
             utility, keyedInfoSets
 
