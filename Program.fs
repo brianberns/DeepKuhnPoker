@@ -9,54 +9,35 @@ open TorchSharp
 
 module InformationSet =
 
+    open LanguagePrimitives
+
     /// Uniform strategy: All actions have equal probability.
     let private uniformStrategy =
         DenseVector.create
             KuhnPoker.actions.Length
-            (1.0 / float KuhnPoker.actions.Length)
+            (DivideByInt GenericOne (KuhnPoker.actions.Length))
 
     /// Normalizes a strategy such that its elements sum to
     /// 1.0 (to represent action probabilities).
     let private normalize strategy =
 
             // assume no negative values during normalization
-        assert(Vector.forall (fun x -> x >= 0.0) strategy)
+        assert(Vector.forall (fun x -> x >= GenericZero) strategy)
 
         let sum = Vector.sum strategy
-        if sum > 0.0 then strategy / sum
+        if sum > GenericZero then strategy / sum
         else uniformStrategy
 
     /// Computes regret-matching strategy from given regrets.
     let getStrategy regrets =
         regrets
-            |> Vector.map (max 0.0)   // clamp negative regrets
+            |> Vector.map (max GenericZero)   // clamp negative regrets
             |> normalize
 
 module KuhnCfrTrainer =
 
     /// Random number generator.
     let private rng = Random(0)
-
-    /// Obtains an info set corresponding to the given key.
-    let private getInfoSet infoSetKey infoSetMap =
-        infoSetMap
-            |> Map.tryFind infoSetKey
-            |> Option.defaultValue InformationSet.zero   // first visit
-
-    /// Updates the active player's reach probability to reflect
-    /// the probability of an action.
-    let private updateReachProbabilities reachProbs activePlayer actionProb =
-        reachProbs
-            |> Vector.mapi (fun i x ->
-                if i = activePlayer then
-                    x * actionProb
-                else x)
-
-    /// Negates opponent's utilties (assuming a zero-zum game).
-    let private getActiveUtilities utilities =
-        utilities
-            |> Seq.map (~-)
-            |> DenseVector.ofSeq
 
     let private advantageNetwork = Network.createAdvantageNetwork 32
 
@@ -67,7 +48,8 @@ module KuhnCfrTrainer =
             |> torch.tensor
             |> advantageNetwork.forward)
             .data<float32>()
-            .ToArray()
+            |> DenseVector.ofSeq
+            |> InformationSet.getStrategy
 
     let private numTraversals = 40
 
