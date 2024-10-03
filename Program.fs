@@ -71,11 +71,10 @@ module KuhnCfrTrainer =
             |> Seq.map (~-)
             |> DenseVector.ofSeq
 
-    let private advantageReservior = Reservoir.create rng 10000
-
-    let private strategyReservior = Reservoir.create rng 10000
-
     let private traverse deal updatingPlayer =
+
+        let append items item =
+            Array.append items (Array.singleton item)
 
         /// Top-level loop.
         let rec loop history =
@@ -112,18 +111,13 @@ module KuhnCfrTrainer =
 
                         // utility of this info set is action utilities weighted by action probabilities
                     let utility = actionUtilities * strategy
-
-                    let experiences =
-                        [|
-                            yield! experiences
-                            yield Choice1Of2 {
-                                InfoSetKey = infoSetKey
-                                Regrets = actionUtilities - utility
-                                Iteration = -1
-                            }
-                        |]
-
-                    utility, experiences
+                    let experience =
+                        Choice1Of2 {
+                            InfoSetKey = infoSetKey
+                            Regrets = actionUtilities - utility
+                            Iteration = -1
+                        }
+                    utility, append experiences experience
 
                 else
                         // sample a single action according to the strategy
@@ -136,23 +130,21 @@ module KuhnCfrTrainer =
                             |> Array.get KuhnPoker.actions
                     let utility, experiences =
                         loop (history + action)
-
-                    let experiences =
-                        [|
-                            yield! experiences
-                            yield Choice2Of2 {
-                                InfoSetKey = infoSetKey
-                                Strategy = strategy
-                                Iteration = -1
-                            }
-                        |]
-
-                    -utility, experiences
+                    let experience =
+                        Choice2Of2 {
+                            InfoSetKey = infoSetKey
+                            Strategy = strategy
+                            Iteration = -1
+                        }
+                    -utility, append experiences experience
 
             utility, experiences
 
-        for _ = 1 to numTraversals do
-            loop "" |> ignore
+        [|
+            for _ = 1 to numTraversals do
+                let _, experiences = loop ""
+                yield! experiences
+        |]
 
     /// Trains for the given number of iterations.
     let train numIterations =
