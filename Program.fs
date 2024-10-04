@@ -134,38 +134,37 @@ module KuhnCfrTrainer =
         loop ""
 
     /// Trains for the given number of iterations.
-    let train numIterations =
+    let train numIterations numTraversals =
 
-        let utilities, () =
+            // each iteration evaluates one possible deal
+        let deals =
+            let permutations =
+                [|
+                    for card0 in KuhnPoker.deck do
+                        for card1 in KuhnPoker.deck do
+                            if card0 <> card1 then
+                                [| card0; card1 |]
+                |]
+            seq {
+                for i = 0 to numIterations - 1 do
+                    yield permutations[i % permutations.Length]
+            }
 
-                // each iteration evaluates one possible deal
-            let deals =
-                let permutations =
-                    [|
-                        for card0 in KuhnPoker.deck do
-                            for card1 in KuhnPoker.deck do
-                                if card0 <> card1 then
-                                    [| card0; card1 |]
-                    |]
-                seq {
-                    for _ = 1 to numIterations do
-                        yield permutations[rng.Next(permutations.Length)]   // avoid bias
-                }
+        let chunks =
+            deals
+                |> Seq.chunkBySize numTraversals
+                |> Seq.indexed
 
-            ((), Seq.indexed deals)
-                ||> Seq.mapFold (fun acc (i, deal) ->
+        let advantageNetworks =
+            Array.init KuhnPoker.numPlayers
+                (fun _ -> Network.createAdvantageNetwork 16)
 
-                        // evaluate one game starting with this deal
-                    let utility =
-                        let updatingPlayer = i % KuhnPoker.numPlayers
-                        traverse deal updatingPlayer
-
-                    utility, acc)
-
-            // compute average utility per deal
-        let utility =
-            Seq.sum utilities / float numIterations
-        utility, infoSetMap
+        for i, chunk in chunks do
+            let updatingPlayer = i % KuhnPoker.numPlayers
+            for deal in chunk do
+                let utility, experiences =
+                    traverse deal updatingPlayer advantageNetworks[updatingPlayer]
+                ()
 
 module Program =
 
@@ -173,8 +172,9 @@ module Program =
 
             // train
         let numIterations = 500000
-        printfn $"Running Kuhn Poker Monte Carlo CFR for {numIterations} iterations\n"
-        let util, infoSetMap = KuhnCfrTrainer.train numIterations
+        let numTraversals = 100
+        printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations\n"
+        let util, infoSetMap = KuhnCfrTrainer.train numIterations numTraversals
 
             // expected overall utility
         printfn $"Average game value for first player: %0.5f{util}\n"
