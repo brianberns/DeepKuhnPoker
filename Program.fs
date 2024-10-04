@@ -168,21 +168,19 @@ module KuhnCfrTrainer =
                         deal
                         updatingPlayer
                         advantageNetworks[updatingPlayer]
-                printfn $"Iteration: {iter}, utility: {utility}"
+                printfn $"Iteration: {iter}, deal: %A{deal} utility: {utility}"
                 for experience in experiences do
-                    match experience with
-                        | Choice1Of2 advExp ->
-                            printfn $"   {advExp}"
-                        | Choice2Of2 stratExp ->
-                            printfn $"   {stratExp}"
+                    printfn $"   %A{experience}"
 
 module Program =
 
     let run () =
 
+        torch.manual_seed(0) |> ignore
+
             // train
-        let numIterations = 50
-        let numTraversals = 100
+        let numIterations = 100
+        let numTraversals = 10
         printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations\n"
         KuhnCfrTrainer.train numIterations numTraversals
 
