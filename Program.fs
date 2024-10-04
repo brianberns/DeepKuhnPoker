@@ -65,7 +65,7 @@ module KuhnCfrTrainer =
             |> DenseVector.ofSeq
 
     /// Evaluates the utility of the given deal.
-    let private traverse deal updatingPlayer advantageNetwork =
+    let private traverse iter deal updatingPlayer advantageNetwork =
 
         /// Appends an item to the end of an array.
         let append items item =
@@ -108,7 +108,7 @@ module KuhnCfrTrainer =
                     Choice1Of2 {
                         InfoSetKey = infoSetKey
                         Regrets = actionUtilities - utility
-                        Iteration = -1
+                        Iteration = iter
                     }
                 utility, append experiences experience
 
@@ -127,7 +127,7 @@ module KuhnCfrTrainer =
                     Choice2Of2 {
                         InfoSetKey = infoSetKey
                         Strategy = strategy
-                        Iteration = -1
+                        Iteration = iter
                     }
                 -utility, append experiences experience
 
@@ -150,7 +150,7 @@ module KuhnCfrTrainer =
                     yield permutations[i % permutations.Length]
             }
 
-        let chunks =
+        let chunkPairs =
             deals
                 |> Seq.chunkBySize numTraversals
                 |> Seq.indexed
@@ -159,23 +159,34 @@ module KuhnCfrTrainer =
             Array.init KuhnPoker.numPlayers
                 (fun _ -> Network.createAdvantageNetwork 16)
 
-        for i, chunk in chunks do
-            let updatingPlayer = i % KuhnPoker.numPlayers
+        for iter, chunk in chunkPairs do
+            let updatingPlayer = iter % KuhnPoker.numPlayers
             for deal in chunk do
                 let utility, experiences =
-                    traverse deal updatingPlayer advantageNetworks[updatingPlayer]
-                ()
+                    traverse
+                        iter
+                        deal
+                        updatingPlayer
+                        advantageNetworks[updatingPlayer]
+                printfn $"Iteration: {iter}, utility: {utility}"
+                for experience in experiences do
+                    match experience with
+                        | Choice1Of2 advExp ->
+                            printfn $"   {advExp}"
+                        | Choice2Of2 stratExp ->
+                            printfn $"   {stratExp}"
 
 module Program =
 
     let run () =
 
             // train
-        let numIterations = 500000
+        let numIterations = 50
         let numTraversals = 100
         printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations\n"
-        let util, infoSetMap = KuhnCfrTrainer.train numIterations numTraversals
+        KuhnCfrTrainer.train numIterations numTraversals
 
+        (*
             // expected overall utility
         printfn $"Average game value for first player: %0.5f{util}\n"
         assert(abs(util - -1.0/18.0) <= 0.02)
@@ -203,6 +214,7 @@ module Program =
             let j = prob "J"
             j >= 0.0 && j <= 1.0/3.0            // bet frequency for a Jack should be between 0 and 1/3
                 && abs((k / j) - 3.0) <= 0.1)   // bet frequency for a King should be three times a Jack
+        *)
 
     let timer = Diagnostics.Stopwatch.StartNew()
     run ()
