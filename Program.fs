@@ -51,16 +51,9 @@ module KuhnCfrTrainer =
     /// Random number generator.
     let private rng = Random(0)
 
-    let private numTraversals = 40
-
-    let private advantageNetwork = Network.createAdvantageNetwork 32
-
-    let private getStrategy infoSetKey =
+    let private getStrategy infoSetKey advantageNetwork =
         use _ = torch.no_grad()   // use model.eval() instead?
-        (infoSetKey
-            |> Network.encodeInput
-            |> torch.tensor
-            |> advantageNetwork.forward)
+        (Network.getAdvantage infoSetKey advantageNetwork)
             .data<float32>()
             |> DenseVector.ofSeq
             |> InformationSet.getStrategy
@@ -71,8 +64,10 @@ module KuhnCfrTrainer =
             |> Seq.map (~-)
             |> DenseVector.ofSeq
 
-    let private traverse deal updatingPlayer =
+    /// Evaluates the utility of the given deal.
+    let private traverse deal updatingPlayer advantageNetwork =
 
+        /// Appends an item to the end of an array.
         let append items item =
             Array.append items (Array.singleton item)
 
@@ -92,59 +87,51 @@ module KuhnCfrTrainer =
             let infoSetKey = deal[activePlayer] + history
 
                 // get player's current strategy for this info set
-            let strategy = getStrategy infoSetKey
+            let strategy = getStrategy infoSetKey advantageNetwork
 
                 // get utility of this info set
-            let utility, experiences =
+            if activePlayer = updatingPlayer then
 
-                if activePlayer = updatingPlayer then
+                    // get utility of each action
+                let actionUtilities, experiences =
+                    let utilities, experienceArrays =
+                        KuhnPoker.actions
+                            |> Array.map (fun action ->
+                                loop (history + action))
+                            |> Array.unzip
+                    getActiveUtilities utilities,
+                    Array.concat experienceArrays
 
-                        // get utility of each action
-                    let actionUtilities, experiences =
-                        let utilities, experienceArrays =
-                            KuhnPoker.actions
-                                |> Array.map (fun action ->
-                                    loop (history + action))
-                                |> Array.unzip
-                        getActiveUtilities utilities,
-                        Array.concat experienceArrays
+                    // utility of this info set is action utilities weighted by action probabilities
+                let utility = actionUtilities * strategy
+                let experience =
+                    Choice1Of2 {
+                        InfoSetKey = infoSetKey
+                        Regrets = actionUtilities - utility
+                        Iteration = -1
+                    }
+                utility, append experiences experience
 
-                        // utility of this info set is action utilities weighted by action probabilities
-                    let utility = actionUtilities * strategy
-                    let experience =
-                        Choice1Of2 {
-                            InfoSetKey = infoSetKey
-                            Regrets = actionUtilities - utility
-                            Iteration = -1
-                        }
-                    utility, append experiences experience
+            else
+                    // sample a single action according to the strategy
+                let action =
+                    let strategy' =
+                        strategy
+                            |> Seq.map float   // ugly
+                            |> Seq.toArray
+                    Categorical.Sample(rng, strategy')
+                        |> Array.get KuhnPoker.actions
+                let utility, experiences =
+                    loop (history + action)
+                let experience =
+                    Choice2Of2 {
+                        InfoSetKey = infoSetKey
+                        Strategy = strategy
+                        Iteration = -1
+                    }
+                -utility, append experiences experience
 
-                else
-                        // sample a single action according to the strategy
-                    let action =
-                        let strategy' =
-                            strategy
-                                |> Seq.map float   // ugly
-                                |> Seq.toArray
-                        Categorical.Sample(rng, strategy')
-                            |> Array.get KuhnPoker.actions
-                    let utility, experiences =
-                        loop (history + action)
-                    let experience =
-                        Choice2Of2 {
-                            InfoSetKey = infoSetKey
-                            Strategy = strategy
-                            Iteration = -1
-                        }
-                    -utility, append experiences experience
-
-            utility, experiences
-
-        [|
-            for _ = 1 to numTraversals do
-                let _, experiences = loop ""
-                yield! experiences
-        |]
+        loop ""
 
     /// Trains for the given number of iterations.
     let train numIterations =

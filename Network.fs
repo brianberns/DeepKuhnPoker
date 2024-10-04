@@ -3,6 +3,8 @@
 open TorchSharp
 open type torch.nn
 
+type Network = Module<torch.Tensor, torch.Tensor>
+
 module Network =
 
     /// Length of longest info set key. E.g. "Jcb".
@@ -21,22 +23,22 @@ module Network =
     let private outputSize = KuhnPoker.actions.Length
 
     /// Advantage network.
-    let createAdvantageNetwork hiddenSize =
+    let createAdvantageNetwork hiddenSize : Network =
         Sequential(
             Linear(inputSize, hiddenSize),
             ReLU(),
             Linear(hiddenSize, outputSize))
 
     /// Strategy network.
-    let createStrategyNetwork hiddenSize =
+    let createStrategyNetwork hiddenSize : Network =
         Sequential(
             Linear(inputSize, hiddenSize),
             ReLU(),
             Linear(hiddenSize, outputSize),
             Softmax(dim = 1))
 
-    /// Encodes info set key as a vector.
-    let encodeInput (infoSetKey : string) =
+    /// Encodes the given info set key as a vector.
+    let private encodeInput (infoSetKey : string) =
 
         let toOneHot c =
             let oneHot =
@@ -59,3 +61,10 @@ module Network =
             |]
         assert(encoded.Length = inputSize)
         encoded
+
+    /// Gets the advantage for the given info set.
+    let getAdvantage infoSetKey (advantageNetwork : Network) =
+        (infoSetKey
+            |> encodeInput
+            |> torch.tensor)
+            --> advantageNetwork
