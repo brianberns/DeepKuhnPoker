@@ -145,8 +145,9 @@ module KuhnCfrTrainer =
                             if card0 <> card1 then
                                 [| card0; card1 |]
                 |]
+            let nDeals = numIterations * numTraversals
             seq {
-                for i = 0 to numIterations - 1 do
+                for i = 0 to nDeals - 1 do
                     yield permutations[i % permutations.Length]
             }
 
@@ -159,18 +160,34 @@ module KuhnCfrTrainer =
             Array.init KuhnPoker.numPlayers
                 (fun _ -> Network.createAdvantageNetwork 16)
 
-        for iter, chunk in chunkPairs do
-            let updatingPlayer = iter % KuhnPoker.numPlayers
-            for deal in chunk do
-                let utility, experiences =
-                    traverse
-                        iter
-                        deal
-                        updatingPlayer
-                        advantageNetworks[updatingPlayer]
-                printfn $"Iteration: {iter}, deal: %A{deal} utility: {utility}"
-                for experience in experiences do
-                    printfn $"   %A{experience}"
+        (Reservoir.create rng 1000, chunkPairs)
+            ||> Seq.fold (fun resv (iter, chunk) ->
+
+                let updatingPlayer = iter % KuhnPoker.numPlayers
+                let advNet = advantageNetworks[updatingPlayer]
+                let experiences =
+                    [|
+                        for deal in chunk do
+                            let _, experiences =
+                                traverse
+                                    iter
+                                    deal
+                                    updatingPlayer
+                                    advNet
+                            yield! experiences
+                    |]
+
+                let advExps =
+                    experiences
+                        |> Seq.choose (function
+                            | Choice1Of2 advExp -> Some advExp
+                            | Choice2Of2 _ -> None)
+                let resv =
+                    (resv, advExps)
+                        ||> Seq.fold (fun resv advExp ->
+                            Reservoir.add advExp resv)
+                resv)
+            |> ignore
 
 module Program =
 
@@ -179,8 +196,8 @@ module Program =
         torch.manual_seed(0) |> ignore
 
             // train
-        let numIterations = 100
-        let numTraversals = 10
+        let numIterations = 5
+        let numTraversals = 5
         printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations\n"
         KuhnCfrTrainer.train numIterations numTraversals
 
