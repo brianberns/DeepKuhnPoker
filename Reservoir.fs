@@ -29,9 +29,10 @@ module Reservoir =
 
     let trySample numSamples reservoir =
         let count = reservoir.Items.Count
-        if numSamples >= count then
+        if numSamples <= count then
             let indexes = [| 0 .. count-1 |]
             reservoir.Random.Shuffle(indexes)
-            Seq.init numSamples (fun i -> indexes[i])
+            Seq.init numSamples (fun i ->
+                reservoir.Items[indexes[i]])
                 |> Some
         else None

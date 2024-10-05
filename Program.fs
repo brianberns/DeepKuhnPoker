@@ -186,6 +186,10 @@ module KuhnCfrTrainer =
                     (resv, advExps)
                         ||> Seq.fold (fun resv advExp ->
                             Reservoir.add advExp resv)
+                match Reservoir.trySample 100 resv with
+                    | Some samples ->
+                        printfn "%A" (Seq.toArray samples)
+                    | None -> ()
                 resv)
             |> ignore
 
@@ -196,7 +200,7 @@ module Program =
         torch.manual_seed(0) |> ignore
 
             // train
-        let numIterations = 5
+        let numIterations = 50
         let numTraversals = 5
         printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations\n"
         KuhnCfrTrainer.train numIterations numTraversals
