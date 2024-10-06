@@ -86,7 +86,11 @@ module Network =
             |> torch.tensor)
             --> advantageNetwork
 
-    let trainAdvantageNetwork samples network =
+    let trainAdvantageNetwork
+        samples
+        network
+        optimizer
+        loss =
 
             // prepare batch data
         let batchInputs =

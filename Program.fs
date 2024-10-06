@@ -144,13 +144,18 @@ module KuhnCfrTrainer =
 
         let advantageNetworks =
             Array.init KuhnPoker.numPlayers
-                (fun _ -> Network.createAdvantageNetwork 16)
+                (fun _ ->
+                    let network =
+                        Network.createAdvantageNetwork 16
+                    network,
+                    torch.optim.Adam(network.parameters(), lr = 0.01))
+        let advantageLoss = torch.nn.MSELoss()
 
         (Reservoir.create rng 1000, chunkPairs)
             ||> Seq.fold (fun resv (iter, chunk) ->
 
                 let updatingPlayer = iter % KuhnPoker.numPlayers
-                let advNet = advantageNetworks[updatingPlayer]
+                let advNetwork, advOptim = advantageNetworks[updatingPlayer]
                 let samples =
                     [|
                         for deal in chunk do
@@ -159,7 +164,7 @@ module KuhnCfrTrainer =
                                     iter
                                     deal
                                     updatingPlayer
-                                    advNet
+                                    advNetwork
                             yield! samples
                     |]
 
@@ -176,7 +181,9 @@ module KuhnCfrTrainer =
                     | Some samples ->
                         Network.trainAdvantageNetwork
                             samples
-                            advantageNetworks[updatingPlayer]
+                            advNetwork
+                            advOptim
+                            advantageLoss
                     | None -> ()
                 resv)
             |> ignore
