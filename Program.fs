@@ -32,14 +32,14 @@ module InformationSet =
             |> Vector.map (max 0.0f)   // clamp negative regrets
             |> normalize
 
-type AdvantageExperience =
+type AdvantageSample =
     {
         InfoSetKey : string
         Regrets : Vector<float32>
         Iteration : int
     }
 
-type StrategyExperience =
+type StrategySample =
     {
         InfoSetKey : string
         Strategy : Vector<float32>
@@ -93,24 +93,24 @@ module KuhnCfrTrainer =
             if activePlayer = updatingPlayer then
 
                     // get utility of each action
-                let actionUtilities, experiences =
-                    let utilities, experienceArrays =
+                let actionUtilities, samples =
+                    let utilities, sampleArrays =
                         KuhnPoker.actions
                             |> Array.map (fun action ->
                                 loop (history + action))
                             |> Array.unzip
                     getActiveUtilities utilities,
-                    Array.concat experienceArrays
+                    Array.concat sampleArrays
 
                     // utility of this info set is action utilities weighted by action probabilities
                 let utility = actionUtilities * strategy
-                let experience =
+                let sample =
                     Choice1Of2 {
                         InfoSetKey = infoSetKey
                         Regrets = actionUtilities - utility
                         Iteration = iter
                     }
-                utility, append experiences experience
+                utility, append samples sample
 
             else
                     // sample a single action according to the strategy
@@ -121,20 +121,21 @@ module KuhnCfrTrainer =
                             |> Seq.toArray
                     Categorical.Sample(rng, strategy')
                         |> Array.get KuhnPoker.actions
-                let utility, experiences =
+                let utility, samples =
                     loop (history + action)
-                let experience =
+                let sample =
                     Choice2Of2 {
                         InfoSetKey = infoSetKey
                         Strategy = strategy
                         Iteration = iter
                     }
-                -utility, append experiences experience
+                -utility, append samples sample
 
         loop ""
 
     let private trainAdvantageNetwork samples network =
-        ()
+        for (sample : AdvantageSample) in samples do
+            sample.InfoSetKey |> ignore
 
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
@@ -168,27 +169,27 @@ module KuhnCfrTrainer =
 
                 let updatingPlayer = iter % KuhnPoker.numPlayers
                 let advNet = advantageNetworks[updatingPlayer]
-                let experiences =
+                let samples =
                     [|
                         for deal in chunk do
-                            let _, experiences =
+                            let _, samples =
                                 traverse
                                     iter
                                     deal
                                     updatingPlayer
                                     advNet
-                            yield! experiences
+                            yield! samples
                     |]
 
-                let advExps =
-                    experiences
+                let advSamples =
+                    samples
                         |> Seq.choose (function
-                            | Choice1Of2 advExp -> Some advExp
+                            | Choice1Of2 advSample -> Some advSample
                             | Choice2Of2 _ -> None)
                 let resv =
-                    (resv, advExps)
-                        ||> Seq.fold (fun resv advExp ->
-                            Reservoir.add advExp resv)
+                    (resv, advSamples)
+                        ||> Seq.fold (fun resv advSample ->
+                            Reservoir.add advSample resv)
                 match Reservoir.trySample 100 resv with
                     | Some samples ->
                         trainAdvantageNetwork
