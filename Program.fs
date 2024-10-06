@@ -133,6 +133,9 @@ module KuhnCfrTrainer =
 
         loop ""
 
+    let private trainAdvantageNetwork samples network =
+        ()
+
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
 
@@ -188,7 +191,9 @@ module KuhnCfrTrainer =
                             Reservoir.add advExp resv)
                 match Reservoir.trySample 100 resv with
                     | Some samples ->
-                        printfn "%A" (Seq.toArray samples)
+                        trainAdvantageNetwork
+                            samples
+                            advantageNetworks[updatingPlayer]
                     | None -> ()
                 resv)
             |> ignore
