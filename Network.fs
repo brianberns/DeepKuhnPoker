@@ -3,7 +3,24 @@
 open TorchSharp
 open type torch.nn
 
+open MathNet.Numerics.Distributions
+open MathNet.Numerics.LinearAlgebra
+
 type Network = Module<torch.Tensor, torch.Tensor>
+
+type AdvantageSample =
+    {
+        InfoSetKey : string
+        Regrets : Vector<float32>
+        Iteration : int
+    }
+
+type StrategySample =
+    {
+        InfoSetKey : string
+        Strategy : Vector<float32>
+        Iteration : int
+    }
 
 module Network =
 
@@ -68,3 +85,21 @@ module Network =
             |> encodeInput
             |> torch.tensor)
             --> advantageNetwork
+
+    let trainAdvantageNetwork samples network =
+
+            // prepare batch data
+        let batchInputs =
+            samples
+                |> Seq.map (fun (sample : AdvantageSample) ->
+                    sample.InfoSetKey
+                        |> encodeInput)
+                |> array2D
+                |> torch.tensor
+        let batchTargets =
+            samples
+                |> Seq.map (fun sample ->
+                    sample.Regrets)
+                |> array2D
+                |> torch.tensor
+        ()

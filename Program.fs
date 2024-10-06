@@ -32,20 +32,6 @@ module InformationSet =
             |> Vector.map (max 0.0f)   // clamp negative regrets
             |> normalize
 
-type AdvantageSample =
-    {
-        InfoSetKey : string
-        Regrets : Vector<float32>
-        Iteration : int
-    }
-
-type StrategySample =
-    {
-        InfoSetKey : string
-        Strategy : Vector<float32>
-        Iteration : int
-    }
-
 module KuhnCfrTrainer =
 
     /// Random number generator.
@@ -133,10 +119,6 @@ module KuhnCfrTrainer =
 
         loop ""
 
-    let private trainAdvantageNetwork samples network =
-        for (sample : AdvantageSample) in samples do
-            sample.InfoSetKey |> ignore
-
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
 
@@ -192,7 +174,7 @@ module KuhnCfrTrainer =
                             Reservoir.add advSample resv)
                 match Reservoir.trySample 100 resv with
                     | Some samples ->
-                        trainAdvantageNetwork
+                        Network.trainAdvantageNetwork
                             samples
                             advantageNetworks[updatingPlayer]
                     | None -> ()
