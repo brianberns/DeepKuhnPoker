@@ -12,9 +12,9 @@ module KuhnCfrTrainer =
     /// Random number generator.
     let private rng = Random(0)
 
-    let private getStrategy infoSetKey advantageNetwork =
+    let private getStrategy infoSetKey model =
         use _ = torch.no_grad()   // use model.eval() instead?
-        (Network.getAdvantage infoSetKey advantageNetwork)
+        (AdvantageModel.getAdvantage infoSetKey model)
             .data<float32>()
             |> DenseVector.ofSeq
             |> InformationSet.getStrategy
@@ -26,7 +26,7 @@ module KuhnCfrTrainer =
             |> DenseVector.ofSeq
 
     /// Evaluates the utility of the given deal.
-    let private traverse iter deal updatingPlayer advantageNetwork =
+    let private traverse iter deal updatingPlayer model =
 
         /// Appends an item to the end of an array.
         let append items item =
@@ -48,7 +48,7 @@ module KuhnCfrTrainer =
             let infoSetKey = deal[activePlayer] + history
 
                 // get player's current strategy for this info set
-            let strategy = getStrategy infoSetKey advantageNetwork
+            let strategy = getStrategy infoSetKey model
 
                 // get utility of this info set
             if activePlayer = updatingPlayer then
@@ -117,13 +117,12 @@ module KuhnCfrTrainer =
                 |> Seq.chunkBySize numTraversals
                 |> Seq.indexed
 
-        let advantageNetworks =
+        let advModels =
             Array.init KuhnPoker.numPlayers
                 (fun _ ->
-                    let network =
-                        Network.createAdvantageNetwork 16
-                    network,
-                    torch.optim.Adam(network.parameters(), lr = 0.01))
+                    let model = AdvantageModel.create 16
+                    model,
+                    torch.optim.Adam(model.parameters(), lr = 0.01))
         let advantageLoss = torch.nn.MSELoss()
 
         (Reservoir.create rng 1000, chunkPairs)
@@ -131,16 +130,12 @@ module KuhnCfrTrainer =
 
                     // traverse this chunk of deals
                 let updatingPlayer = iter % KuhnPoker.numPlayers
-                let advNetwork, advOptim = advantageNetworks[updatingPlayer]
+                let advModel, advOptim = advModels[updatingPlayer]
                 let newSamples =
                     [|
                         for deal in chunk do
                             let _, samples =
-                                traverse
-                                    iter
-                                    deal
-                                    updatingPlayer
-                                    advNetwork
+                                traverse iter deal updatingPlayer advModel
                             yield! samples
                     |]
 
@@ -155,15 +150,15 @@ module KuhnCfrTrainer =
                         ||> Seq.fold (fun resv advSample ->
                             Reservoir.add advSample resv)
 
-                    // train advantage network
+                    // train advantage model
                 for _ = 1 to 20 do
                     match Reservoir.trySample 100 resv with
                         | Some samples ->
-                            Network.trainAdvantageNetwork
+                            AdvantageModel.train
                                 samples
-                                advNetwork
                                 advOptim
                                 advantageLoss
+                                advModel
                         | None -> ()
 
                 resv)

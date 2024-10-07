@@ -5,7 +5,15 @@ open type torch.nn
 
 open MathNet.Numerics.LinearAlgebra
 
-type Network = Module<torch.Tensor, torch.Tensor>
+type Model = Module<torch.Tensor, torch.Tensor>
+
+module private Model =
+
+    /// Length of neural network input.
+    let inputSize = KuhnPoker.Encoding.encodedLength
+
+    /// Length of neural network output.
+    let outputSize = KuhnPoker.actions.Length
 
 type AdvantageSample =
     {
@@ -14,48 +22,28 @@ type AdvantageSample =
         Iteration : int
     }
 
-type StrategySample =
-    {
-        InfoSetKey : string
-        Strategy : Vector<float32>
-        Iteration : int
-    }
+type AdvantageModel = Model
 
-module Network =
+module AdvantageModel =
 
-    /// Length of neural network input.
-    let private inputSize = KuhnPoker.Encoding.encodedLength
-
-    /// Length of neural network output.
-    let private outputSize = KuhnPoker.actions.Length
-
-    /// Advantage network.
-    let createAdvantageNetwork hiddenSize : Network =
+    /// Creates an advantage model.
+    let create hiddenSize : AdvantageModel =
         Sequential(
-            Linear(inputSize, hiddenSize),
+            Linear(Model.inputSize, hiddenSize),
             ReLU(),
-            Linear(hiddenSize, outputSize))
-
-    /// Strategy network.
-    let createStrategyNetwork hiddenSize : Network =
-        Sequential(
-            Linear(inputSize, hiddenSize),
-            ReLU(),
-            Linear(hiddenSize, outputSize),
-            Softmax(dim = 1))
+            Linear(hiddenSize, Model.outputSize))
 
     /// Gets the advantage for the given info set.
-    let getAdvantage infoSetKey (advantageNetwork : Network) =
+    let getAdvantage infoSetKey (model : AdvantageModel) =
         (infoSetKey
             |> KuhnPoker.Encoding.encodeInput
             |> torch.tensor)
-            --> advantageNetwork
+            --> model
 
-    let trainAdvantageNetwork
-        samples
-        network
+    let train samples
         (optimizer : torch.optim.Optimizer)
-        (criterion : Loss<_, _, torch.Tensor>) =
+        (criterion : Loss<_, _, torch.Tensor>)
+        (model : AdvantageModel) =
 
             // forward pass
         let loss =
@@ -72,10 +60,29 @@ module Network =
                         sample.Regrets)
                     |> array2D
                     |> torch.tensor
-            let outputs = inputs --> network
+            let outputs = inputs --> model
             criterion.forward(outputs, targets)
 
             // backward pass and optimize
         optimizer.zero_grad()
         loss.backward()
         optimizer.step() |> ignore
+
+type StrategySample =
+    {
+        InfoSetKey : string
+        Strategy : Vector<float32>
+        Iteration : int
+    }
+
+type StrategyModel = Model
+
+module StrategyModel =
+
+    /// Creates a strategy model.
+    let create hiddenSize : StrategyModel =
+        Sequential(
+            Linear(Model.inputSize, hiddenSize),
+            ReLU(),
+            Linear(hiddenSize, Model.outputSize),
+            Softmax(dim = 1))

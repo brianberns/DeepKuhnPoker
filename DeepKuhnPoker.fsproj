@@ -8,7 +8,7 @@
   <ItemGroup>
     <Compile Include="Reservoir.fs" />
     <Compile Include="KuhnPoker.fs" />
-    <Compile Include="Network.fs" />
+    <Compile Include="Model.fs" />
     <Compile Include="InformationSet.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
