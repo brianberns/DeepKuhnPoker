@@ -13,7 +13,7 @@ type Reservoir<'t> =
         Capacity : int
 
         /// Items stored in this reservoir, indexed from
-        /// 0 to Capacity - 1.
+        /// 0 to Count - 1.
         Items : Map<int, 't>
     }
 
@@ -22,17 +22,26 @@ type Reservoir<'t> =
 
 module Reservoir =
 
+    /// Validates the given reservoir.
+    let private isValid reservoir =
+        Seq.toArray reservoir.Items.Keys
+            = [| 0 .. reservoir.Count - 1 |]
+
     /// Creates an empty reservoir.
     let create rng capacity =
-        {
-            Random = rng
-            Capacity = capacity
-            Items = Map.empty
-        }
+        let reservoir =
+            {
+                Random = rng
+                Capacity = capacity
+                Items = Map.empty
+            }
+        assert(isValid reservoir)
+        reservoir
 
     /// Adds the given item to the given reservior, replacing
     /// an existing item at random if necessary.
-    let add item (reservoir : Reservoir<_>) =
+    let add item reservoir =
+        assert(isValid reservoir)
         let idx =
             if reservoir.Count < reservoir.Capacity then
                 reservoir.Count
@@ -43,7 +52,8 @@ module Reservoir =
 
     /// Answers the given number of items from the given
     /// reservoir at random, if possible.
-    let trySample numSamples (reservoir : Reservoir<_>) =
+    let trySample numSamples reservoir =
+        assert(isValid reservoir)
         if numSamples <= reservoir.Count then
             let idxs = [| 0 .. reservoir.Count - 1 |]
             reservoir.Random.Shuffle(idxs)
