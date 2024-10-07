@@ -3,7 +3,6 @@
 open TorchSharp
 open type torch.nn
 
-open MathNet.Numerics.Distributions
 open MathNet.Numerics.LinearAlgebra
 
 type Network = Module<torch.Tensor, torch.Tensor>
@@ -89,21 +88,26 @@ module Network =
     let trainAdvantageNetwork
         samples
         network
-        optimizer
-        loss =
+        (optimizer : torch.optim.Optimizer)
+        (loss : Loss<_, _, torch.Tensor>) =
 
             // prepare batch data
-        let batchInputs =
+        let inputs =
             samples
                 |> Seq.map (fun (sample : AdvantageSample) ->
                     sample.InfoSetKey
                         |> encodeInput)
                 |> array2D
                 |> torch.tensor
-        let batchTargets =
+        let targets =
             samples
                 |> Seq.map (fun sample ->
                     sample.Regrets)
                 |> array2D
                 |> torch.tensor
+        let outputs = inputs --> network
+        let loss = loss.forward(outputs, targets)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step() |> ignore
         ()
