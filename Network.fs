@@ -89,25 +89,27 @@ module Network =
         samples
         network
         (optimizer : torch.optim.Optimizer)
-        (loss : Loss<_, _, torch.Tensor>) =
+        (criterion : Loss<_, _, torch.Tensor>) =
 
-            // prepare batch data
-        let inputs =
-            samples
-                |> Seq.map (fun (sample : AdvantageSample) ->
-                    sample.InfoSetKey
-                        |> encodeInput)
-                |> array2D
-                |> torch.tensor
-        let targets =
-            samples
-                |> Seq.map (fun sample ->
-                    sample.Regrets)
-                |> array2D
-                |> torch.tensor
-        let outputs = inputs --> network
-        let loss = loss.forward(outputs, targets)
+            // forward pass
+        let loss =
+            let inputs =
+                samples
+                    |> Seq.map (fun (sample : AdvantageSample) ->
+                        sample.InfoSetKey
+                            |> encodeInput)
+                    |> array2D
+                    |> torch.tensor
+            let targets =
+                samples
+                    |> Seq.map (fun sample ->
+                        sample.Regrets)
+                    |> array2D
+                    |> torch.tensor
+            let outputs = inputs --> network
+            criterion.forward(outputs, targets)
+
+            // backward pass and optimize
         optimizer.zero_grad()
         loss.backward()
         optimizer.step() |> ignore
-        ()
