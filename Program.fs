@@ -154,9 +154,10 @@ module KuhnCfrTrainer =
         (Reservoir.create rng 1000, chunkPairs)
             ||> Seq.fold (fun resv (iter, chunk) ->
 
+                    // traverse this chunk of deals
                 let updatingPlayer = iter % KuhnPoker.numPlayers
                 let advNetwork, advOptim = advantageNetworks[updatingPlayer]
-                let samples =
+                let newSamples =
                     [|
                         for deal in chunk do
                             let _, samples =
@@ -168,8 +169,9 @@ module KuhnCfrTrainer =
                             yield! samples
                     |]
 
+                    // update advantage reservoir
                 let advSamples =
-                    samples
+                    newSamples
                         |> Seq.choose (function
                             | Choice1Of2 advSample -> Some advSample
                             | Choice2Of2 _ -> None)
@@ -177,14 +179,18 @@ module KuhnCfrTrainer =
                     (resv, advSamples)
                         ||> Seq.fold (fun resv advSample ->
                             Reservoir.add advSample resv)
-                match Reservoir.trySample 100 resv with
-                    | Some samples ->
-                        Network.trainAdvantageNetwork
-                            samples
-                            advNetwork
-                            advOptim
-                            advantageLoss
-                    | None -> ()
+
+                    // train advantage network
+                for _ = 1 to 20 do
+                    match Reservoir.trySample 100 resv with
+                        | Some samples ->
+                            Network.trainAdvantageNetwork
+                                samples
+                                advNetwork
+                                advOptim
+                                advantageLoss
+                        | None -> ()
+
                 resv)
             |> ignore
 
