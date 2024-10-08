@@ -69,8 +69,19 @@ module AdvantageModel =
                         sample.Regrets)
                     |> array2D
                     |> torch.tensor
+            let iters =
+                samples
+                    |> Seq.map (fun sample ->
+                        (sample.Iteration + 1)   // make 1-based
+                            |> float32
+                            |> sqrt
+                            |> Seq.singleton )
+                    |> array2D
+                    |> torch.tensor
             let outputs = inputs --> model
-            criterion.forward(outputs, targets)
+            criterion.forward(
+                iters * outputs,   // favor newer iterations
+                iters * targets)
 
             // backward pass and optimize
         optimizer.zero_grad()
