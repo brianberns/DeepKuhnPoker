@@ -21,9 +21,8 @@ module KuhnCfrTrainer =
         Seq.init numDeals (fun i ->
             permutations[i % permutations.Length])
 
-    /// Random number generator.
-    let private rng = Random(0)
-
+    /// Computes strategy for the given info set using the
+    /// given advantage model.
     let private getStrategy infoSetKey model =
         use _ = torch.no_grad()   // use model.eval() instead?
         (AdvantageModel.getAdvantage infoSetKey model)
@@ -36,6 +35,9 @@ module KuhnCfrTrainer =
         utilities
             |> Seq.map (~-)
             |> DenseVector.ofSeq
+
+    /// Random number generator.
+    let private rng = Random(0)
 
     /// Evaluates the utility of the given deal.
     let private traverse iter deal updatingPlayer model =
@@ -106,6 +108,7 @@ module KuhnCfrTrainer =
 
         loop ""
 
+    /// Creates an advantage model and optimizer.
     let private createAdvantageModel hiddenSize learningRate =
         let model = AdvantageModel.create hiddenSize
         let optim =
@@ -120,20 +123,22 @@ module KuhnCfrTrainer =
     let private numModelTrainSteps = 20
     let private numSamples = 10
 
-    let private updateAdvantageModel samples resv optim loss model =
+    let private updateAdvantageModel
+        reservoir
+        newSamples
+        trainModel =
 
             // update reservoir
         let resv =
-            (resv, samples)
-                ||> Seq.fold (fun resv advSample ->
+            (reservoir, newSamples)
+                ||> Seq.fold (fun resv (advSample : AdvantageSample) ->
                     Reservoir.add advSample resv)
 
             // train model
         for _ = 1 to numModelTrainSteps do
             resv
                 |> Reservoir.trySample numSamples
-                |> Option.iter (fun samples ->
-                    AdvantageModel.train samples optim loss model)
+                |> Option.iter trainModel
 
         resv
 
@@ -173,11 +178,14 @@ module KuhnCfrTrainer =
                             | Choice1Of2 advSample -> Some advSample
                             | Choice2Of2 _ -> None)
                 updateAdvantageModel
-                    advSamples
                     resv
-                    advOptim
-                    advLoss
-                    advModel)
+                    advSamples
+                    (fun samples ->
+                        AdvantageModel.train
+                            samples
+                            advOptim
+                            advLoss
+                            advModel))
             |> ignore
 
 module Program =
