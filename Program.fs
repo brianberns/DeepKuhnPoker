@@ -94,12 +94,6 @@ module KuhnCfrTrainer =
 
         loop ""
 
-    let private hiddenSize = 16
-    let private learningRate = 0.01
-    let private reservoirCapacity = 1000
-    let private numModelTrainSteps = 20
-    let private numSamples = 100
-
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
 
@@ -122,6 +116,12 @@ module KuhnCfrTrainer =
             deals
                 |> Seq.chunkBySize numTraversals
                 |> Seq.indexed
+
+        let hiddenSize = 16
+        let learningRate = 0.01
+        let reservoirCapacity = 1000
+        let numModelTrainSteps = 20
+        let numSamples = 10
 
         let advModels =
             Array.init KuhnPoker.numPlayers
