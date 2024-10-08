@@ -9,6 +9,18 @@ open TorchSharp
 
 module KuhnCfrTrainer =
 
+    /// Repeating sequence of possible deals.
+    let getDeals numDeals =
+        let permutations =
+            [|
+                for card0 in KuhnPoker.deck do
+                    for card1 in KuhnPoker.deck do
+                        if card0 <> card1 then
+                            [| card0; card1 |]
+            |]
+        Seq.init numDeals (fun i ->
+            permutations[i % permutations.Length])
+
     /// Random number generator.
     let private rng = Random(0)
 
@@ -128,23 +140,8 @@ module KuhnCfrTrainer =
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
 
-            // each iteration evaluates one possible deal
-        let deals =
-            let permutations =
-                [|
-                    for card0 in KuhnPoker.deck do
-                        for card1 in KuhnPoker.deck do
-                            if card0 <> card1 then
-                                [| card0; card1 |]
-                |]
-            let nDeals = numIterations * numTraversals
-            seq {
-                for i = 0 to nDeals - 1 do
-                    yield permutations[i % permutations.Length]
-            }
-
         let chunkPairs =
-            deals
+            getDeals (numIterations * numTraversals)
                 |> Seq.chunkBySize numTraversals
                 |> Seq.indexed
 
