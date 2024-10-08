@@ -22,6 +22,15 @@ type AdvantageSample =
         Iteration : int
     }
 
+module AdvantageSample =
+
+    let create infoSetKey regrets iteration =
+        {
+            InfoSetKey = infoSetKey
+            Regrets = regrets
+            Iteration = iteration
+        }
+
 type AdvantageModel = Model
 
 module AdvantageModel =
@@ -74,6 +83,15 @@ type StrategySample =
         Strategy : Vector<float32>
         Iteration : int
     }
+
+module StrategySample =
+
+    let create infoSetKey regrets iteration =
+        {
+            InfoSetKey = infoSetKey
+            Strategy = regrets
+            Iteration = iteration
+        }
 
 type StrategyModel = Model
 

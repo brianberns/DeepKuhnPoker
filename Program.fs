@@ -80,11 +80,10 @@ module KuhnCfrTrainer =
                     // utility of this info set is action utilities weighted by action probabilities
                 let utility = actionUtilities * strategy
                 let sample =
-                    Choice1Of2 {
-                        InfoSetKey = infoSetKey
-                        Regrets = actionUtilities - utility
-                        Iteration = iter
-                    }
+                    AdvantageSample.create
+                        infoSetKey
+                        (actionUtilities - utility)
+                        iter |> Choice1Of2
                 utility, append samples sample
 
             else
@@ -99,11 +98,10 @@ module KuhnCfrTrainer =
                 let utility, samples =
                     loop (history + action)
                 let sample =
-                    Choice2Of2 {
-                        InfoSetKey = infoSetKey
-                        Strategy = strategy
-                        Iteration = iter
-                    }
+                    StrategySample.create
+                        infoSetKey
+                        strategy
+                        iter |> Choice2Of2
                 -utility, append samples sample
 
         loop "" |> snd
