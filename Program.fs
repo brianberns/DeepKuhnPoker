@@ -96,10 +96,11 @@ module KuhnCfrTrainer =
 
     let private createAdvantageModel hiddenSize learningRate =
         let model = AdvantageModel.create hiddenSize
-        model,
-        torch.optim.Adam(
-            model.parameters(),
-            lr = learningRate)
+        let optim =
+            torch.optim.Adam(
+                model.parameters(),
+                lr = learningRate)
+        model, optim
 
     let private hiddenSize = 16
     let private learningRate = 0.01
@@ -117,14 +118,10 @@ module KuhnCfrTrainer =
 
             // train model
         for _ = 1 to numModelTrainSteps do
-            match Reservoir.trySample numSamples resv with
-                | Some samples ->
-                    AdvantageModel.train
-                        samples
-                        optim
-                        loss
-                        model
-                | None -> ()
+            resv
+                |> Reservoir.trySample numSamples
+                |> Option.iter (fun samples ->
+                    AdvantageModel.train samples optim loss model)
 
         resv
 
