@@ -44,7 +44,7 @@ module KuhnCfrTrainer =
 
         /// Appends an item to the end of an array.
         let append items item =
-            Array.append items (Array.singleton item)
+            [| yield! items; yield item |]
 
         /// Top-level loop.
         let rec loop history =
