@@ -94,6 +94,10 @@ module KuhnCfrTrainer =
 
         loop ""
 
+    let private learningRate = 0.01
+    let private reservoirCapacity = 1000
+    let private numModelTrainSteps = 20
+
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
 
@@ -122,10 +126,13 @@ module KuhnCfrTrainer =
                 (fun _ ->
                     let model = AdvantageModel.create 16
                     model,
-                    torch.optim.Adam(model.parameters(), lr = 0.01))
-        let advantageLoss = torch.nn.MSELoss()
+                    torch.optim.Adam(
+                        model.parameters(),
+                        lr = learningRate))
+        let advLoss = torch.nn.MSELoss()
+        let advReservoir = Reservoir.create rng reservoirCapacity
 
-        (Reservoir.create rng 1000, chunkPairs)
+        (advReservoir, chunkPairs)
             ||> Seq.fold (fun resv (iter, chunk) ->
 
                     // traverse this chunk of deals
@@ -151,13 +158,13 @@ module KuhnCfrTrainer =
                             Reservoir.add advSample resv)
 
                     // train advantage model
-                for _ = 1 to 20 do
+                for _ = 1 to numModelTrainSteps do
                     match Reservoir.trySample 100 resv with
                         | Some samples ->
                             AdvantageModel.train
                                 samples
                                 advOptim
-                                advantageLoss
+                                advLoss
                                 advModel
                         | None -> ()
 
