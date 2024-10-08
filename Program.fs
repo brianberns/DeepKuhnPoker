@@ -106,7 +106,7 @@ module KuhnCfrTrainer =
                     }
                 -utility, append samples sample
 
-        loop ""
+        loop "" |> snd
 
     /// Creates an advantage model and optimizer.
     let private createAdvantageModel hiddenSize learningRate =
@@ -145,6 +145,7 @@ module KuhnCfrTrainer =
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
 
+            // gather chunks of deals
         let chunkPairs =
             getDeals (numIterations * numTraversals)
                 |> Seq.chunkBySize numTraversals
@@ -164,12 +165,10 @@ module KuhnCfrTrainer =
                 let updatingPlayer = iter % KuhnPoker.numPlayers
                 let advModel, advOptim = advModelPairs[updatingPlayer]
                 let newSamples =
-                    [|
-                        for deal in chunk do
-                            let _, samples =
-                                traverse iter deal updatingPlayer advModel
-                            yield! samples
-                    |]
+                    chunk
+                        |> Array.collect (fun deal ->
+                            traverse
+                                iter deal updatingPlayer advModel)
 
                     // update advantages
                 let advSamples =
