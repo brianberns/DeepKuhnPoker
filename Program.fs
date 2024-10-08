@@ -123,7 +123,7 @@ module KuhnCfrTrainer =
         let numModelTrainSteps = 20
         let numSamples = 10
 
-        let advModels =
+        let advModelPairs =
             Array.init KuhnPoker.numPlayers
                 (fun _ ->
                     let model = AdvantageModel.create hiddenSize
@@ -139,7 +139,7 @@ module KuhnCfrTrainer =
 
                     // traverse this chunk of deals
                 let updatingPlayer = iter % KuhnPoker.numPlayers
-                let advModel, advOptim = advModels[updatingPlayer]
+                let advModel, advOptim = advModelPairs[updatingPlayer]
                 let newSamples =
                     [|
                         for deal in chunk do
@@ -180,8 +180,8 @@ module Program =
         torch.manual_seed(0) |> ignore
 
             // train
-        let numIterations = 50
-        let numTraversals = 5
+        let numIterations = 1000
+        let numTraversals = 6   // all possible deals
         printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations\n"
         KuhnCfrTrainer.train numIterations numTraversals
 
