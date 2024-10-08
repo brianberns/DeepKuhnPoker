@@ -4,12 +4,6 @@ open MathNet.Numerics.LinearAlgebra
 
 module InformationSet =
 
-    /// Uniform strategy: All actions have equal probability.
-    let private uniformStrategy =
-        DenseVector.create
-            KuhnPoker.actions.Length
-            (1.0f / float32 KuhnPoker.actions.Length)
-
     /// Normalizes a strategy such that its elements sum to
     /// 1.0 (to represent action probabilities).
     let private normalize strategy =
@@ -19,7 +13,11 @@ module InformationSet =
 
         let sum = Vector.sum strategy
         if sum > 0.0f then strategy / sum
-        else uniformStrategy
+        else
+            let idx = Vector.maxIndex strategy
+            DenseVector.init strategy.Count (fun i ->
+                if i = idx then 1.0f
+                else 0.0f)
 
     /// Computes regret-matching strategy from given regrets.
     let getStrategy regrets =
