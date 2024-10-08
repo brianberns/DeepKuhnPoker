@@ -94,6 +94,40 @@ module KuhnCfrTrainer =
 
         loop ""
 
+    let private createAdvantageModel hiddenSize learningRate =
+        let model = AdvantageModel.create hiddenSize
+        model,
+        torch.optim.Adam(
+            model.parameters(),
+            lr = learningRate)
+
+    let private hiddenSize = 16
+    let private learningRate = 0.01
+    let private reservoirCapacity = 1000
+    let private numModelTrainSteps = 20
+    let private numSamples = 10
+
+    let private updateAdvantageModel samples resv optim loss model =
+
+            // update reservoir
+        let resv =
+            (resv, samples)
+                ||> Seq.fold (fun resv advSample ->
+                    Reservoir.add advSample resv)
+
+            // train model
+        for _ = 1 to numModelTrainSteps do
+            match Reservoir.trySample numSamples resv with
+                | Some samples ->
+                    AdvantageModel.train
+                        samples
+                        optim
+                        loss
+                        model
+                | None -> ()
+
+        resv
+
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
 
@@ -117,20 +151,10 @@ module KuhnCfrTrainer =
                 |> Seq.chunkBySize numTraversals
                 |> Seq.indexed
 
-        let hiddenSize = 16
-        let learningRate = 0.01
-        let reservoirCapacity = 1000
-        let numModelTrainSteps = 20
-        let numSamples = 10
-
         let advModelPairs =
             Array.init KuhnPoker.numPlayers
                 (fun _ ->
-                    let model = AdvantageModel.create hiddenSize
-                    model,
-                    torch.optim.Adam(
-                        model.parameters(),
-                        lr = learningRate))
+                    createAdvantageModel hiddenSize learningRate)
         let advLoss = torch.nn.MSELoss()
         let advReservoir = Reservoir.create rng reservoirCapacity
 
@@ -148,29 +172,18 @@ module KuhnCfrTrainer =
                             yield! samples
                     |]
 
-                    // update advantage reservoir
+                    // update advantages
                 let advSamples =
                     newSamples
                         |> Seq.choose (function
                             | Choice1Of2 advSample -> Some advSample
                             | Choice2Of2 _ -> None)
-                let resv =
-                    (resv, advSamples)
-                        ||> Seq.fold (fun resv advSample ->
-                            Reservoir.add advSample resv)
-
-                    // train advantage model
-                for _ = 1 to numModelTrainSteps do
-                    match Reservoir.trySample numSamples resv with
-                        | Some samples ->
-                            AdvantageModel.train
-                                samples
-                                advOptim
-                                advLoss
-                                advModel
-                        | None -> ()
-
-                resv)
+                updateAdvantageModel
+                    advSamples
+                    resv
+                    advOptim
+                    advLoss
+                    advModel)
             |> ignore
 
 module Program =
@@ -180,7 +193,7 @@ module Program =
         torch.manual_seed(0) |> ignore
 
             // train
-        let numIterations = 1000
+        let numIterations = 50
         let numTraversals = 6   // all possible deals
         printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations\n"
         KuhnCfrTrainer.train numIterations numTraversals
