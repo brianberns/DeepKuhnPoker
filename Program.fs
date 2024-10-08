@@ -94,9 +94,11 @@ module KuhnCfrTrainer =
 
         loop ""
 
+    let private hiddenSize = 16
     let private learningRate = 0.01
     let private reservoirCapacity = 1000
     let private numModelTrainSteps = 20
+    let private numSamples = 100
 
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
@@ -124,7 +126,7 @@ module KuhnCfrTrainer =
         let advModels =
             Array.init KuhnPoker.numPlayers
                 (fun _ ->
-                    let model = AdvantageModel.create 16
+                    let model = AdvantageModel.create hiddenSize
                     model,
                     torch.optim.Adam(
                         model.parameters(),
@@ -159,7 +161,7 @@ module KuhnCfrTrainer =
 
                     // train advantage model
                 for _ = 1 to numModelTrainSteps do
-                    match Reservoir.trySample 100 resv with
+                    match Reservoir.trySample numSamples resv with
                         | Some samples ->
                             AdvantageModel.train
                                 samples
