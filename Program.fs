@@ -99,7 +99,7 @@ module KuhnCfrTrainer =
         let model = AdvantageModel.create hiddenSize
         let optim =
             torch.optim.Adam(
-                model.parameters(),
+                model.Network.parameters(),
                 lr = learningRate)
         model, optim
 

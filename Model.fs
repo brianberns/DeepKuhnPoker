@@ -5,9 +5,9 @@ open type torch.nn
 
 open MathNet.Numerics.LinearAlgebra
 
-type Model = Module<torch.Tensor, torch.Tensor>
+type Network = Module<torch.Tensor, torch.Tensor>
 
-module private Model =
+module private Network =
 
     /// Length of neural network input.
     let inputSize = KuhnPoker.Encoding.encodedLength
@@ -31,28 +31,39 @@ module AdvantageSample =
             Iteration = iteration
         }
 
-type AdvantageModel = Model
+type AdvantageModel =
+    {
+        mutable IsTrained : bool
+        Network : Network
+    }
 
 module AdvantageModel =
 
     /// Creates an advantage model.
     let create hiddenSize : AdvantageModel =
-        Sequential(
-            Linear(Model.inputSize, hiddenSize),
-            ReLU(),
-            Linear(hiddenSize, Model.outputSize))
+        {
+            IsTrained = false
+            Network =
+                Sequential(
+                    Linear(Network.inputSize, hiddenSize),
+                    ReLU(),
+                    Linear(hiddenSize, Network.outputSize))
+        }
 
     /// Gets the advantage for the given info set.
-    let getAdvantage infoSetKey (model : AdvantageModel) =
-        (infoSetKey
-            |> KuhnPoker.Encoding.encodeInput
-            |> torch.tensor)
-            --> model
+    let getAdvantage infoSetKey model =
+        if model.IsTrained then
+            (infoSetKey
+                |> KuhnPoker.Encoding.encodeInput
+                |> torch.tensor)
+                --> model.Network
+        else
+            torch.ones(Network.outputSize)
 
     let train samples
         (optimizer : torch.optim.Optimizer)
         (criterion : Loss<_, _, torch.Tensor>)
-        (model : AdvantageModel) =
+        model =
 
             // forward pass
         let loss =
@@ -78,7 +89,7 @@ module AdvantageModel =
                             |> Seq.singleton )
                     |> array2D
                     |> torch.tensor
-            let outputs = inputs --> model
+            let outputs = inputs --> model.Network
             criterion.forward(
                 iters * outputs,   // favor newer iterations
                 iters * targets)
@@ -87,6 +98,8 @@ module AdvantageModel =
         optimizer.zero_grad()
         loss.backward()
         optimizer.step() |> ignore
+
+        model.IsTrained <- true
 
 type StrategySample =
     {
@@ -104,14 +117,14 @@ module StrategySample =
             Iteration = iteration
         }
 
-type StrategyModel = Model
+type StrategyModel = Network
 
 module StrategyModel =
 
     /// Creates a strategy model.
     let create hiddenSize : StrategyModel =
         Sequential(
-            Linear(Model.inputSize, hiddenSize),
+            Linear(Network.inputSize, hiddenSize),
             ReLU(),
-            Linear(hiddenSize, Model.outputSize),
+            Linear(hiddenSize, Network.outputSize),
             Softmax(dim = 1))
