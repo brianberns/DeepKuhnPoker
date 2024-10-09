@@ -9,18 +9,6 @@ open TorchSharp
 
 module KuhnCfrTrainer =
 
-    /// Repeating sequence of possible deals.
-    let getDeals numDeals =
-        let permutations =
-            [|
-                for card0 in KuhnPoker.deck do
-                    for card1 in KuhnPoker.deck do
-                        if card0 <> card1 then
-                            [| card0; card1 |]
-            |]
-        Seq.init numDeals (fun i ->
-            permutations[i % permutations.Length])
-
     /// Computes strategy for the given info set using the
     /// given advantage model.
     let private getStrategy infoSetKey model =
@@ -145,7 +133,9 @@ module KuhnCfrTrainer =
 
             // gather chunks of deals
         let chunkPairs =
-            getDeals (numIterations * numTraversals)
+            let numDeals = numIterations * numTraversals
+            Seq.init numDeals (fun i ->
+                KuhnPoker.allDeals[i % KuhnPoker.allDeals.Length])
                 |> Seq.chunkBySize numTraversals
                 |> Seq.indexed
 
@@ -167,6 +157,24 @@ module KuhnCfrTrainer =
                         |> Array.collect (fun deal ->
                             traverse
                                 iter deal updatingPlayer advModel)
+
+                if updatingPlayer = 1 then
+                    use _ = torch.no_grad()
+                    let avg =
+                        let strategies =
+                            resv.Items.Values
+                                |> Seq.where (fun (sample : AdvantageSample) ->
+                                    sample.InfoSetKey = "Kb")
+                                |> Seq.map (fun sample ->
+                                    InformationSet.getStrategy sample.Regrets)
+                                |> Seq.toArray
+                        if strategies.Length > 0 then
+                            strategies
+                                |> Seq.averageBy (fun strategy ->
+                                    strategy[0])
+                        else 0.0f
+                    let kb = getStrategy "Kb" advModel
+                    printfn $"Kb bet: %f{kb[0].ToScalar().ToDouble()}, {avg}"
 
                     // update advantages
                 let advSamples =
@@ -193,7 +201,7 @@ module Program =
 
             // train
         let numIterations = 50
-        let numTraversals = 6   // all possible deals
+        let numTraversals = KuhnPoker.allDeals.Length
         printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations\n"
         KuhnCfrTrainer.train numIterations numTraversals
 

@@ -1,5 +1,7 @@
 ﻿namespace DeepKuhnPoker
 
+type Deal = string[]   // cards indexed by player
+
 /// Kuhn poker
 module KuhnPoker =
 
@@ -20,6 +22,15 @@ module KuhnPoker =
             "Q"   // Queen
             "K"   // King
         ]
+
+    /// All possible deals.
+    let allDeals : Deal[] =
+        [|
+            for card0 in deck do
+                for card1 in deck do
+                    if card0 <> card1 then
+                        [| card0; card1 |]
+        |]
 
     /// Gets zero-based index of active player.
     let getActivePlayer (history : string) =
