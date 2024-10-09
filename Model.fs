@@ -60,7 +60,8 @@ module AdvantageModel =
         else
             torch.ones(Network.outputSize)
 
-    let train samples
+    let train
+        samples
         (optimizer : torch.optim.Optimizer)
         (criterion : Loss<_, _, torch.Tensor>)
         model =
