@@ -94,6 +94,11 @@ module KuhnCfrTrainer =
 
         loop "" |> snd
 
+    let private createPlayerMap initializer =
+        Seq.init KuhnPoker.numPlayers (fun i ->
+            i, initializer i)
+            |> Map
+
     /// Creates an advantage model and optimizer.
     let private createAdvantageModel hiddenSize learningRate =
         let model = AdvantageModel.create hiddenSize
@@ -110,9 +115,7 @@ module KuhnCfrTrainer =
     let private numSamples = 10
 
     let private updateAdvantageModel
-        reservoir
-        newSamples
-        trainModel =
+        reservoir newSamples optim loss model =
 
             // update reservoir
         let resv =
@@ -121,12 +124,17 @@ module KuhnCfrTrainer =
                     Reservoir.add advSample resv)
 
             // train model
-        for _ = 1 to numModelTrainSteps do
-            resv
-                |> Reservoir.trySample numSamples
-                |> Option.iter trainModel
+        let model =
+            (model, Seq.init numModelTrainSteps id)
+                ||> Seq.fold (fun model _ ->
+                    resv
+                        |> Reservoir.trySample numSamples
+                        |> Option.map (fun samples ->
+                            AdvantageModel.train
+                                samples optim loss model)
+                        |> Option.defaultValue model)
 
-        resv
+        resv, model
 
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
@@ -140,51 +148,46 @@ module KuhnCfrTrainer =
                 |> Seq.indexed
 
         let advModelPairs =
-            Array.init KuhnPoker.numPlayers
-                (fun _ ->
-                    createAdvantageModel hiddenSize learningRate)
+            createPlayerMap (fun _ ->
+                createAdvantageModel hiddenSize learningRate)
         let advLoss = torch.nn.MSELoss()
         let advReservoirs =
-            Seq.init KuhnPoker.numPlayers
-                (fun player ->
-                    let resv =
-                        Reservoir.create rng reservoirCapacity
-                    player, resv)
-                |> Map
+            createPlayerMap (fun _ ->
+                Reservoir.create rng reservoirCapacity)
 
-        (advReservoirs, chunkPairs)
-            ||> Seq.fold (fun resvs (iter, chunk) ->
+        let advModelPairs, _ =
+            ((advModelPairs, advReservoirs), chunkPairs)
+                ||> Seq.fold (fun (modelPairs, resvs) (iter, chunk) ->
 
-                    // traverse this chunk of deals
-                let updatingPlayer = iter % KuhnPoker.numPlayers
-                let advModel, advOptim = advModelPairs[updatingPlayer]
-                let newSamples =
-                    chunk
-                        |> Array.collect (fun deal ->
-                            traverse
-                                iter deal updatingPlayer advModel)
+                        // traverse this chunk of deals
+                    let updatingPlayer = iter % KuhnPoker.numPlayers
+                    let advModel, advOptim = modelPairs[updatingPlayer]
+                    let newSamples =
+                        chunk
+                            |> Array.collect (fun deal ->
+                                traverse
+                                    iter deal updatingPlayer advModel)
 
-                    // update advantages
-                let advSamples =
-                    newSamples
-                        |> Seq.choose (function
-                            | Choice1Of2 advSample -> Some advSample
-                            | Choice2Of2 _ -> None)
-                let resv =
-                    updateAdvantageModel
-                        resvs[updatingPlayer]
-                        advSamples
-                        (fun samples ->
-                            AdvantageModel.train
-                                samples
-                                advOptim
-                                advLoss
-                                advModel)
-                Map.add updatingPlayer resv resvs)
-            |> ignore
+                        // update advantages
+                    let advSamples =
+                        newSamples
+                            |> Seq.choose (function
+                                | Choice1Of2 advSample -> Some advSample
+                                | Choice2Of2 _ -> None)
+                    let resv, advModel =
+                        updateAdvantageModel
+                            resvs[updatingPlayer]
+                            advSamples
+                            advOptim
+                            advLoss
+                            advModel
+                    let modelPairs = Map.add updatingPlayer (advModel, advOptim) modelPairs
+                    let resvs = Map.add updatingPlayer resv resvs
+                    modelPairs, resvs)
 
-        advModelPairs
-            |> Array.map fst
+        advModelPairs.Values
+            |> Seq.map fst
+            |> Seq.toArray
 
 module Program =
 

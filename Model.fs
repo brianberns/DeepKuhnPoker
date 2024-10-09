@@ -33,7 +33,7 @@ module AdvantageSample =
 
 type AdvantageModel =
     {
-        mutable IsTrained : bool
+        IsTrained : bool
         Network : Network
     }
 
@@ -60,11 +60,7 @@ module AdvantageModel =
         else
             torch.ones(Network.outputSize)
 
-    let train
-        samples
-        (optimizer : torch.optim.Optimizer)
-        (criterion : Loss<_, _, torch.Tensor>)
-        model =
+    let train samples optimizer criterion model =
 
             // forward pass
         let loss =
@@ -91,16 +87,16 @@ module AdvantageModel =
                     |> array2D
                     |> torch.tensor
             let outputs = inputs --> model.Network
-            criterion.forward(
+            (criterion : Loss<_, _, torch.Tensor>).forward(
                 iters * outputs,   // favor newer iterations
                 iters * targets)
 
             // backward pass and optimize
-        optimizer.zero_grad()
+        (optimizer : torch.optim.Optimizer).zero_grad()
         loss.backward()
         optimizer.step() |> ignore
 
-        model.IsTrained <- true
+        { model with IsTrained = true }
 
 type StrategySample =
     {
