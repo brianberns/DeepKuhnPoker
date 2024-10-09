@@ -11,7 +11,7 @@ module KuhnCfrTrainer =
 
     /// Computes strategy for the given info set using the
     /// given advantage model.
-    let private getStrategy infoSetKey model =
+    let getStrategy infoSetKey model =
         use _ = torch.no_grad()   // use model.eval() instead?
         (AdvantageModel.getAdvantage infoSetKey model)
             .data<float32>()
@@ -158,24 +158,6 @@ module KuhnCfrTrainer =
                             traverse
                                 iter deal updatingPlayer advModel)
 
-                if updatingPlayer = 1 then
-                    use _ = torch.no_grad()
-                    let avg =
-                        let strategies =
-                            resv.Items.Values
-                                |> Seq.where (fun (sample : AdvantageSample) ->
-                                    sample.InfoSetKey = "Kb")
-                                |> Seq.map (fun sample ->
-                                    InformationSet.getStrategy sample.Regrets)
-                                |> Seq.toArray
-                        if strategies.Length > 0 then
-                            strategies
-                                |> Seq.averageBy (fun strategy ->
-                                    strategy[0])
-                        else 0.0f
-                    let kb = getStrategy "Kb" advModel
-                    printfn $"Kb bet: %f{kb[0].ToScalar().ToDouble()}, {avg}"
-
                     // update advantages
                 let advSamples =
                     newSamples
@@ -193,7 +175,30 @@ module KuhnCfrTrainer =
                             advModel))
             |> ignore
 
+        advModelPairs
+            |> Array.map fst
+
 module Program =
+
+    let playerInfoSetKeys =
+        [|
+            [|
+                "J"
+                "Q"
+                "K"
+                "Jcb"
+                "Qcb"
+                "Kcb"
+            |]
+            [|
+                "Jb"
+                "Jc"
+                "Qb"
+                "Qc"
+                "Kb"
+                "Kc"
+            |]
+        |]
 
     let run () =
 
@@ -202,38 +207,22 @@ module Program =
             // train
         let numIterations = 50
         let numTraversals = KuhnPoker.allDeals.Length
-        printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations\n"
-        KuhnCfrTrainer.train numIterations numTraversals
+        printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations"
+        let advModels = KuhnCfrTrainer.train numIterations numTraversals
 
-        (*
-            // expected overall utility
-        printfn $"Average game value for first player: %0.5f{util}\n"
-        assert(abs(util - -1.0/18.0) <= 0.02)
-
-            // strategy
-        printfn "Strategy:"
-        for (KeyValue(key, infoSet)) in infoSetMap do
-            let str =
+        for player = 0 to KuhnPoker.numPlayers - 1 do
+            let advModel = advModels[player]
+            let infoSetKeys = playerInfoSetKeys[player]
+            printfn $"\nPlayer {player}"
+            for infoSetKey in infoSetKeys do
                 let strategy =
-                    InformationSet.getAverageStrategy infoSet
-                (strategy.ToArray(), KuhnPoker.actions)
-                    ||> Array.map2 (fun prob action ->
-                        sprintf "%s: %0.5f" action prob)
-                    |> String.concat ", "
-            printfn $"%-3s{key}:    {str}"
-        assert(
-            let betAction =
-                Array.IndexOf(KuhnPoker.actions, "b")
-            let prob key =
-                let strategy =
-                    infoSetMap[key]
-                        |> InformationSet.getAverageStrategy
-                strategy[betAction]
-            let k = prob "K"
-            let j = prob "J"
-            j >= 0.0 && j <= 1.0/3.0            // bet frequency for a Jack should be between 0 and 1/3
-                && abs((k / j) - 3.0) <= 0.1)   // bet frequency for a King should be three times a Jack
-        *)
+                    KuhnCfrTrainer.getStrategy infoSetKey advModel
+                printfn "   %-3s: %s = %0.3f, %s = %0.3f"
+                    infoSetKey
+                    KuhnPoker.actions[0]
+                    strategy[0]
+                    KuhnPoker.actions[1]
+                    strategy[1]
 
     let timer = Diagnostics.Stopwatch.StartNew()
     run ()
