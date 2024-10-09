@@ -144,10 +144,16 @@ module KuhnCfrTrainer =
                 (fun _ ->
                     createAdvantageModel hiddenSize learningRate)
         let advLoss = torch.nn.MSELoss()
-        let advReservoir = Reservoir.create rng reservoirCapacity
+        let advReservoirs =
+            Seq.init KuhnPoker.numPlayers
+                (fun player ->
+                    let resv =
+                        Reservoir.create rng reservoirCapacity
+                    player, resv)
+                |> Map
 
-        (advReservoir, chunkPairs)
-            ||> Seq.fold (fun resv (iter, chunk) ->
+        (advReservoirs, chunkPairs)
+            ||> Seq.fold (fun resvs (iter, chunk) ->
 
                     // traverse this chunk of deals
                 let updatingPlayer = iter % KuhnPoker.numPlayers
@@ -164,15 +170,17 @@ module KuhnCfrTrainer =
                         |> Seq.choose (function
                             | Choice1Of2 advSample -> Some advSample
                             | Choice2Of2 _ -> None)
-                updateAdvantageModel
-                    resv
-                    advSamples
-                    (fun samples ->
-                        AdvantageModel.train
-                            samples
-                            advOptim
-                            advLoss
-                            advModel))
+                let resv =
+                    updateAdvantageModel
+                        resvs[updatingPlayer]
+                        advSamples
+                        (fun samples ->
+                            AdvantageModel.train
+                                samples
+                                advOptim
+                                advLoss
+                                advModel)
+                Map.add updatingPlayer resv resvs)
             |> ignore
 
         advModelPairs
