@@ -182,22 +182,8 @@ module Program =
 
     let playerInfoSetKeys =
         [|
-            [|
-                "J"
-                "Q"
-                "K"
-                "Jcb"
-                "Qcb"
-                "Kcb"
-            |]
-            [|
-                "Jb"
-                "Jc"
-                "Qb"
-                "Qc"
-                "Kb"
-                "Kc"
-            |]
+            [| "J"; "Q"; "K"; "Jcb"; "Qcb"; "Kcb" |]
+            [| "Jb"; "Jc"; "Qb"; "Qc"; "Kb"; "Kc" |]
         |]
 
     let run () =
