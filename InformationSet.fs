@@ -4,23 +4,19 @@ open MathNet.Numerics.LinearAlgebra
 
 module InformationSet =
 
-    /// Normalizes a strategy such that its elements sum to
-    /// 1.0 (to represent action probabilities).
-    let private normalize strategy =
+    /// Computes strategy from the given regrets. A strategy
+    /// is normalized so that its elements sum to 1.0 (to
+    /// represent action probabilities).
+    let getStrategy regrets =
 
-            // assume no negative values during normalization
-        assert(Vector.forall (fun x -> x >= 0.0f) strategy)
+            // find highest-value action
+        let idx = Vector.maxIndex regrets
 
-        let sum = Vector.sum strategy
-        if sum > 0.0f then strategy / sum
+            // scale if possible, or choose highest-value action
+        if regrets[idx] > 0.0f then
+            let clamped = Vector.map (max 0.0f) regrets   // clamp negative regrets
+            clamped / Vector.sum clamped
         else
-            let idx = Vector.maxIndex strategy
-            DenseVector.init strategy.Count (fun i ->
+            DenseVector.init regrets.Count (fun i ->
                 if i = idx then 1.0f
                 else 0.0f)
-
-    /// Computes regret-matching strategy from given regrets.
-    let getStrategy regrets =
-        regrets
-            |> Vector.map (max 0.0f)   // clamp negative regrets
-            |> normalize
