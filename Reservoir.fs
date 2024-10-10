@@ -50,14 +50,12 @@ module Reservoir =
         { reservoir with
             Items = Map.add idx item reservoir.Items }
 
-    /// Answers the given number of items from the given
+    /// Answers up to the given number of items from the given
     /// reservoir at random, if possible.
-    let trySample numSamples reservoir =
+    let sample numSamples reservoir =
         assert(isValid reservoir)
-        if numSamples <= reservoir.Count then
-            let idxs = [| 0 .. reservoir.Count - 1 |]
-            reservoir.Random.Shuffle(idxs)
-            Seq.init numSamples (fun i ->
-                reservoir.Items[idxs[i]])
-                |> Some
-        else None
+        let numSamples = min numSamples reservoir.Count
+        let idxs = [| 0 .. reservoir.Count - 1 |]
+        reservoir.Random.Shuffle(idxs)
+        Seq.init numSamples (fun i ->
+            reservoir.Items[idxs[i]])

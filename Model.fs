@@ -64,7 +64,7 @@ module AdvantageModel =
                 |> torch.tensor)
                 --> model.Network
         else
-            torch.ones(Network.outputSize)
+            torch.ones(Network.outputSize)   // uniform
 
     let train samples optimizer criterion model =
 
