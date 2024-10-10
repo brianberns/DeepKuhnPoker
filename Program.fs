@@ -235,7 +235,8 @@ module KuhnCfrTrainer =
                                 sample.InfoSetKey.Length,
                                 List.findIndex (fun card ->
                                     card = sample.InfoSetKey[0..0])
-                                    KuhnPoker.deck)
+                                    KuhnPoker.deck,
+                                sample.InfoSetKey)
                     for sample in sorted do
                         printfn "      %-3s: %s = %6.3f, %s = %6.3f (%d)"
                             sample.InfoSetKey
@@ -250,7 +251,7 @@ module KuhnCfrTrainer =
                             (AdvantageModel.getAdvantage infoSetKey advModel)
                                 .data<float32>()
                                 |> Seq.toArray
-                        printfn "      %-3s: %s = %.3f, %s = %.3f (advantage)"
+                        printfn "      %-3s: %s = %6.3f, %s = %6.3f (advantage)"
                             infoSetKey
                             KuhnPoker.actions[0]
                             advantages[0]
@@ -258,7 +259,7 @@ module KuhnCfrTrainer =
                             advantages[1]
                         let strategy =
                             getStrategy infoSetKey advModel
-                        printfn "      %-3s: %s = %.3f, %s = %.3f (strategy)"
+                        printfn "      %-3s: %s = %6.3f, %s = %6.3f (strategy)"
                             infoSetKey
                             KuhnPoker.actions[0]
                             strategy[0]
@@ -272,10 +273,10 @@ module KuhnCfrTrainer =
 module Program =
 
     /// Number of CFR iterations to perform.
-    let private numIterations = 1
+    let private numIterations = 10
 
     /// Number of deals to traverse during each iteration.
-    let private numTraversals = 100 * KuhnPoker.allDeals.Length
+    let private numTraversals = 10 * KuhnPoker.allDeals.Length
 
     let run () =
 
