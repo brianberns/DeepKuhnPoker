@@ -15,10 +15,16 @@ module private Network =
     /// Length of neural network output.
     let outputSize = KuhnPoker.actions.Length
 
+/// An observed advantage event.
 type AdvantageSample =
     {
+        /// Key of info set.
         InfoSetKey : string
+
+        /// Observed regrets.
         Regrets : Vector<float32>
+
+        /// 0-based iteration number.
         Iteration : int
     }
 

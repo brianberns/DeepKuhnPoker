@@ -9,6 +9,7 @@ open TorchSharp
 
 module Choice =
 
+    /// Unzips a sequence of choices.
     let unzip choices =
         let opts =
             choices
@@ -19,17 +20,18 @@ module Choice =
         Seq.choose fst opts,
         Seq.choose snd opts
 
-type private AdvantageState =
+type private AdvantageStateMap =
     Map<int,
-        AdvantageModel
-            * torch.optim.Optimizer
-            * Reservoir<AdvantageSample>>
+        {|
+            Model : AdvantageModel
+            Optimizer : torch.optim.Optimizer
+            Reservoir : Reservoir<AdvantageSample>
+        |}>
 
-module private AdvantageState =
+module private AdvantageStateMap =
 
     let create
-        hiddenSize learningRate rng reservoirCapacity
-            : AdvantageState =
+        hiddenSize learningRate rng reservoirCapacity =
         Seq.init KuhnPoker.numPlayers (fun i ->
             let model = AdvantageModel.create hiddenSize
             let optim : torch.optim.Optimizer =
@@ -37,16 +39,24 @@ module private AdvantageState =
                     model.Network.parameters(),
                     lr = learningRate)
             let resv = Reservoir.create rng reservoirCapacity
-            i, (model, optim, resv))
+            let state =
+                {|
+                    Model = model
+                    Optimizer = optim
+                    Reservoir = resv
+                |}
+            i, state)
             |> Map
 
     let update
-        player model optim reservoir (state : AdvantageState)
-            : AdvantageState =
-        Map.add
-            player
-            (model, optim, reservoir)
-            state
+        player model optimizer reservoir stateMap =
+        let state =
+            {|
+                Model = model
+                Optimizer = optimizer
+                Reservoir = reservoir
+            |}
+        Map.add player state stateMap
 
 module KuhnCfrTrainer =
 
@@ -174,19 +184,20 @@ module KuhnCfrTrainer =
                 |> Seq.chunkBySize numTraversals
                 |> Seq.indexed
 
-        let advState =
-            AdvantageState.create
+        let advStateMap =
+            AdvantageStateMap.create
                 hiddenSize learningRate rng reservoirCapacity
         let advLoss = torch.nn.MSELoss()
 
-        let advState =
-            (advState, chunkPairs)
+        let advStateMap =
+            (advStateMap, chunkPairs)
                 ||> Seq.fold (fun advState (iter, chunk) ->
 
                         // traverse this chunk of deals
                     let updatingPlayer = iter % KuhnPoker.numPlayers
                     let advModel, advOptim, advResv =
-                        advState[updatingPlayer]
+                        let advState = advStateMap[updatingPlayer]
+                        advState.Model, advState.Optimizer, advState.Reservoir
                     let newSamples =
                         chunk
                             |> Array.collect (fun deal ->
@@ -198,11 +209,11 @@ module KuhnCfrTrainer =
                     let advResv, advModel =
                         updateAdvantageModel
                             advResv advSamples advOptim advLoss advModel
-                    AdvantageState.update
+                    AdvantageStateMap.update
                         updatingPlayer advModel advOptim advResv advState)
 
-        advState.Values
-            |> Seq.map (fun (model, _, _) -> model)
+        advStateMap.Values
+            |> Seq.map (fun state -> state.Model)
             |> Seq.toArray
 
 module Program =

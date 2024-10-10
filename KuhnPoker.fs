@@ -70,6 +70,7 @@ module KuhnPoker =
         /// Length of longest info set key. E.g. "Jcb".
         let private maxInfoSetKeyLength = 3
 
+        /// Length of an encoded info set key.
         let encodedLength = maxInfoSetKeyLength * oneHotLength
 
         /// Encodes the given info set key as a vector.
