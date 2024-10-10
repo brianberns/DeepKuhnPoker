@@ -8,50 +8,33 @@ open MathNet.Numerics.LinearAlgebra
 open TorchSharp
 
 type private AdvantageState =
-    {
-        ModelPairs : Map<int, AdvantageModel * torch.optim.Optimizer>
-        Reservoirs : Map<int, Reservoir<AdvantageSample>>
-    }
+    Map<int,
+        AdvantageModel
+            * torch.optim.Optimizer
+            * Reservoir<AdvantageSample>>
 
 module private AdvantageState =
 
-    let private createPlayerMap initializer =
+    let create
+        hiddenSize learningRate rng reservoirCapacity
+            : AdvantageState =
         Seq.init KuhnPoker.numPlayers (fun i ->
-            i, initializer i)
+            let model = AdvantageModel.create hiddenSize
+            let optim : torch.optim.Optimizer =
+                torch.optim.Adam(
+                    model.Network.parameters(),
+                    lr = learningRate)
+            let resv = Reservoir.create rng reservoirCapacity
+            i, (model, optim, resv))
             |> Map
 
-    /// Creates an advantage model and optimizer.
-    let private createAdvantageModel hiddenSize learningRate =
-        let model = AdvantageModel.create hiddenSize
-        let optim =
-            torch.optim.Adam(
-                model.Network.parameters(),
-                lr = learningRate)
-        model, (optim : torch.optim.Optimizer)
-
-    let create hiddenSize learningRate rng reservoirCapacity =
-        {
-            ModelPairs =
-                createPlayerMap (fun _ ->
-                    createAdvantageModel hiddenSize learningRate)
-            Reservoirs =
-                createPlayerMap (fun _ ->
-                    Reservoir.create rng reservoirCapacity)
-        }
-
-    let update player model optim reservoir state =
-        {
-            ModelPairs =
-                Map.add
-                    player
-                    (model, optim)
-                    state.ModelPairs
-            Reservoirs =
-                Map.add
-                    player
-                    reservoir
-                    state.Reservoirs
-        }
+    let update
+        player model optim reservoir (state : AdvantageState)
+            : AdvantageState =
+        Map.add
+            player
+            (model, optim, reservoir)
+            state
 
 module KuhnCfrTrainer =
 
@@ -190,8 +173,8 @@ module KuhnCfrTrainer =
 
                         // traverse this chunk of deals
                     let updatingPlayer = iter % KuhnPoker.numPlayers
-                    let advModel, advOptim =
-                        advState.ModelPairs[updatingPlayer]
+                    let advModel, advOptim, advResv =
+                        advState[updatingPlayer]
                     let newSamples =
                         chunk
                             |> Array.collect (fun deal ->
@@ -205,14 +188,13 @@ module KuhnCfrTrainer =
                                 | Choice1Of2 advSample -> Some advSample
                                 | Choice2Of2 _ -> None)
                     let advResv, advModel =
-                        let advResv = advState.Reservoirs[updatingPlayer]
                         updateAdvantageModel
                             advResv advSamples advOptim advLoss advModel
                     AdvantageState.update
                         updatingPlayer advModel advOptim advResv advState)
 
-        advState.ModelPairs.Values
-            |> Seq.map fst
+        advState.Values
+            |> Seq.map (fun (model, _, _) -> model)
             |> Seq.toArray
 
 module Program =
