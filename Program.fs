@@ -20,17 +20,22 @@ module Choice =
         Seq.choose fst opts,
         Seq.choose snd opts
 
-type private AdvantageStateMap =
-    Map<int,
-        {|
-            Model : AdvantageModel
-            Optimizer : torch.optim.Optimizer
-            Reservoir : Reservoir<AdvantageSample>
-        |}>
+/// State required to train advantage models.
+type private AdvantageState =
+    {
+        /// Current model.
+        Model : AdvantageModel
 
-module private AdvantageStateMap =
+        /// Current model's optimizer.
+        Optimizer : torch.optim.Optimizer
 
-    let create
+        /// Training data.
+        Reservoir : Reservoir<AdvantageSample>
+    }
+
+module private AdvantageState =
+
+    let createMap
         hiddenSize learningRate rng reservoirCapacity =
         Seq.init KuhnPoker.numPlayers (fun i ->
             let model = AdvantageModel.create hiddenSize
@@ -40,22 +45,22 @@ module private AdvantageStateMap =
                     lr = learningRate)
             let resv = Reservoir.create rng reservoirCapacity
             let state =
-                {|
+                {
                     Model = model
                     Optimizer = optim
                     Reservoir = resv
-                |}
+                }
             i, state)
             |> Map
 
-    let update
+    let updateMap
         player model optimizer reservoir stateMap =
         let state =
-            {|
+            {
                 Model = model
                 Optimizer = optimizer
                 Reservoir = reservoir
-            |}
+            }
         Map.add player state stateMap
 
 module KuhnCfrTrainer =
@@ -185,7 +190,7 @@ module KuhnCfrTrainer =
                 |> Seq.indexed
 
         let advStateMap =
-            AdvantageStateMap.create
+            AdvantageState.createMap
                 hiddenSize learningRate rng reservoirCapacity
         let advLoss = torch.nn.MSELoss()
 
@@ -209,7 +214,7 @@ module KuhnCfrTrainer =
                     let advResv, advModel =
                         updateAdvantageModel
                             advResv advSamples advOptim advLoss advModel
-                    AdvantageStateMap.update
+                    AdvantageState.updateMap
                         updatingPlayer advModel advOptim advResv advState)
 
         advStateMap.Values
