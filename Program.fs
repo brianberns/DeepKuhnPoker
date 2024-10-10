@@ -35,26 +35,27 @@ type private AdvantageState =
 
 module private AdvantageState =
 
+    /// Initializes advantage state for each player.
     let createMap
         hiddenSize learningRate rng reservoirCapacity =
-        Seq.init KuhnPoker.numPlayers (fun i ->
-            let model = AdvantageModel.create hiddenSize
-            let optim : torch.optim.Optimizer =
-                torch.optim.Adam(
-                    model.Network.parameters(),
-                    lr = learningRate)
-            let resv = Reservoir.create rng reservoirCapacity
+        Seq.init KuhnPoker.numPlayers (fun player ->
             let state =
+                let model = AdvantageModel.create hiddenSize
                 {
                     Model = model
-                    Optimizer = optim
-                    Reservoir = resv
+                    Optimizer =
+                        torch.optim.Adam(
+                            model.Network.parameters(),
+                            lr = learningRate)
+                    Reservoir =
+                        Reservoir.create rng reservoirCapacity
                 }
-            i, state)
+            player, state)
             |> Map
 
+    /// Updates advantage state for the given player.
     let updateMap
-        player model optimizer reservoir stateMap =
+        (player : int) model optimizer reservoir stateMap =
         let state =
             {
                 Model = model
@@ -64,6 +65,9 @@ module private AdvantageState =
         Map.add player state stateMap
 
 module KuhnCfrTrainer =
+
+    /// Random number generator.
+    let private rng = Random(0)
 
     /// Computes strategy for the given info set using the
     /// given advantage model.
@@ -79,9 +83,6 @@ module KuhnCfrTrainer =
         utilities
             |> Seq.map (~-)
             |> DenseVector.ofSeq
-
-    /// Random number generator.
-    let private rng = Random(0)
 
     /// Evaluates the utility of the given deal.
     let private traverse iter deal updatingPlayer model =
@@ -156,18 +157,20 @@ module KuhnCfrTrainer =
     let private numModelTrainSteps = 20
     let private numSamples = 10
 
+    /// Adds the given samples to the given reservoir and
+    /// then uses the reservoir to train the given model.
     let private updateAdvantageModel
         reservoir newSamples optim loss model =
 
             // update reservoir
         let resv =
             (reservoir, newSamples)
-                ||> Seq.fold (fun resv (advSample : AdvantageSample) ->
+                ||> Seq.fold (fun resv advSample ->
                     Reservoir.add advSample resv)
 
             // train model
         let model =
-            (model, Seq.init numModelTrainSteps id)
+            (model, seq { 1 .. numModelTrainSteps })
                 ||> Seq.fold (fun model _ ->
                     resv
                         |> Reservoir.trySample numSamples
@@ -196,13 +199,13 @@ module KuhnCfrTrainer =
 
         let advStateMap =
             (advStateMap, chunkPairs)
-                ||> Seq.fold (fun advState (iter, chunk) ->
+                ||> Seq.fold (fun advStateMap (iter, chunk) ->
 
                         // traverse this chunk of deals
                     let updatingPlayer = iter % KuhnPoker.numPlayers
                     let advModel, advOptim, advResv =
-                        let advState = advStateMap[updatingPlayer]
-                        advState.Model, advState.Optimizer, advState.Reservoir
+                        let state = advStateMap[updatingPlayer]
+                        state.Model, state.Optimizer, state.Reservoir
                     let newSamples =
                         chunk
                             |> Array.collect (fun deal ->
@@ -215,7 +218,7 @@ module KuhnCfrTrainer =
                         updateAdvantageModel
                             advResv advSamples advOptim advLoss advModel
                     AdvantageState.updateMap
-                        updatingPlayer advModel advOptim advResv advState)
+                        updatingPlayer advModel advOptim advResv advStateMap)
 
         advStateMap.Values
             |> Seq.map (fun state -> state.Model)
