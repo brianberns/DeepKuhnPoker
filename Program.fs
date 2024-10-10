@@ -7,6 +7,52 @@ open MathNet.Numerics.LinearAlgebra
 
 open TorchSharp
 
+type private AdvantageState =
+    {
+        ModelPairs : Map<int, AdvantageModel * torch.optim.Optimizer>
+        Reservoirs : Map<int, Reservoir<AdvantageSample>>
+    }
+
+module private AdvantageState =
+
+    let private createPlayerMap initializer =
+        Seq.init KuhnPoker.numPlayers (fun i ->
+            i, initializer i)
+            |> Map
+
+    /// Creates an advantage model and optimizer.
+    let private createAdvantageModel hiddenSize learningRate =
+        let model = AdvantageModel.create hiddenSize
+        let optim =
+            torch.optim.Adam(
+                model.Network.parameters(),
+                lr = learningRate)
+        model, (optim : torch.optim.Optimizer)
+
+    let create hiddenSize learningRate rng reservoirCapacity =
+        {
+            ModelPairs =
+                createPlayerMap (fun _ ->
+                    createAdvantageModel hiddenSize learningRate)
+            Reservoirs =
+                createPlayerMap (fun _ ->
+                    Reservoir.create rng reservoirCapacity)
+        }
+
+    let update player model optim reservoir state =
+        {
+            ModelPairs =
+                Map.add
+                    player
+                    (model, optim)
+                    state.ModelPairs
+            Reservoirs =
+                Map.add
+                    player
+                    reservoir
+                    state.Reservoirs
+        }
+
 module KuhnCfrTrainer =
 
     /// Computes strategy for the given info set using the
@@ -94,20 +140,6 @@ module KuhnCfrTrainer =
 
         loop "" |> snd
 
-    let private createPlayerMap initializer =
-        Seq.init KuhnPoker.numPlayers (fun i ->
-            i, initializer i)
-            |> Map
-
-    /// Creates an advantage model and optimizer.
-    let private createAdvantageModel hiddenSize learningRate =
-        let model = AdvantageModel.create hiddenSize
-        let optim =
-            torch.optim.Adam(
-                model.Network.parameters(),
-                lr = learningRate)
-        model, optim
-
     let private hiddenSize = 16
     let private learningRate = 0.01
     let private reservoirCapacity = 1000
@@ -147,21 +179,19 @@ module KuhnCfrTrainer =
                 |> Seq.chunkBySize numTraversals
                 |> Seq.indexed
 
-        let advModelPairs =
-            createPlayerMap (fun _ ->
-                createAdvantageModel hiddenSize learningRate)
+        let advState =
+            AdvantageState.create
+                hiddenSize learningRate rng reservoirCapacity
         let advLoss = torch.nn.MSELoss()
-        let advReservoirs =
-            createPlayerMap (fun _ ->
-                Reservoir.create rng reservoirCapacity)
 
-        let advModelPairs, _ =
-            ((advModelPairs, advReservoirs), chunkPairs)
-                ||> Seq.fold (fun (modelPairs, resvs) (iter, chunk) ->
+        let advState =
+            (advState, chunkPairs)
+                ||> Seq.fold (fun advState (iter, chunk) ->
 
                         // traverse this chunk of deals
                     let updatingPlayer = iter % KuhnPoker.numPlayers
-                    let advModel, advOptim = modelPairs[updatingPlayer]
+                    let advModel, advOptim =
+                        advState.ModelPairs[updatingPlayer]
                     let newSamples =
                         chunk
                             |> Array.collect (fun deal ->
@@ -174,18 +204,14 @@ module KuhnCfrTrainer =
                             |> Seq.choose (function
                                 | Choice1Of2 advSample -> Some advSample
                                 | Choice2Of2 _ -> None)
-                    let resv, advModel =
+                    let advResv, advModel =
+                        let advResv = advState.Reservoirs[updatingPlayer]
                         updateAdvantageModel
-                            resvs[updatingPlayer]
-                            advSamples
-                            advOptim
-                            advLoss
-                            advModel
-                    let modelPairs = Map.add updatingPlayer (advModel, advOptim) modelPairs
-                    let resvs = Map.add updatingPlayer resv resvs
-                    modelPairs, resvs)
+                            advResv advSamples advOptim advLoss advModel
+                    AdvantageState.update
+                        updatingPlayer advModel advOptim advResv advState)
 
-        advModelPairs.Values
+        advState.ModelPairs.Values
             |> Seq.map fst
             |> Seq.toArray
 
