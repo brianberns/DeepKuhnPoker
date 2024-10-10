@@ -7,6 +7,18 @@ open MathNet.Numerics.LinearAlgebra
 
 open TorchSharp
 
+module Choice =
+
+    let unzip choices =
+        let opts =
+            choices
+                |> Seq.map (function
+                    | Choice1Of2 ch -> Some ch, None
+                    | Choice2Of2 ch -> None, Some ch)
+                |> Seq.cache
+        Seq.choose fst opts,
+        Seq.choose snd opts
+
 type private AdvantageState =
     Map<int,
         AdvantageModel
@@ -182,11 +194,7 @@ module KuhnCfrTrainer =
                                     iter deal updatingPlayer advModel)
 
                         // update advantages
-                    let advSamples =
-                        newSamples
-                            |> Seq.choose (function
-                                | Choice1Of2 advSample -> Some advSample
-                                | Choice2Of2 _ -> None)
+                    let advSamples, stratSamples = Choice.unzip newSamples
                     let advResv, advModel =
                         updateAdvantageModel
                             advResv advSamples advOptim advLoss advModel
