@@ -185,81 +185,61 @@ module KuhnCfrTrainer =
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
 
-            // gather chunks of deals
-        let chunkPairs =
-            let numDeals = numIterations * numTraversals
-            Seq.init numDeals (fun i ->
-                KuhnPoker.allDeals[i % KuhnPoker.allDeals.Length])
-                |> Seq.chunkBySize numTraversals
-                |> Seq.indexed
-
             // create advantage model
         let advStateMap =
             AdvantageState.createMap
                 hiddenSize learningRate rng reservoirCapacity
         let advLoss = torch.nn.MSELoss()
 
-        let playerInfoSetKeys =
-            [|
-                [| "J"; "Q"; "K"; "Jcb"; "Qcb"; "Kcb" |]
-                [| "Jb"; "Jc"; "Qb"; "Qc"; "Kb"; "Kc" |]
-            |]
-
-            // train the model on each chunk of deals
         let advStateMap =
-            (advStateMap, chunkPairs)
-                ||> Seq.fold (fun advStateMap (iter, chunk) ->
 
-                        // traverse this chunk of deals
-                    let updatingPlayer = iter % KuhnPoker.numPlayers
-                    let advModel, advOptim, advResv =
-                        let state = advStateMap[updatingPlayer]
-                        state.Model, state.Optimizer, state.Reservoir
-                    let advSamples, stratSamples = 
-                        chunk
-                            |> Array.collect (fun deal ->
-                                traverse
-                                    iter deal updatingPlayer advModel)
-                            |> Choice.unzip
+                // for each iteration
+            (advStateMap, seq { 0 .. numIterations - 1 })
+                ||> Seq.fold (fun advStateMap iter ->
 
-                        // update advantages
-                    let advResv, advModel =
-                        updateAdvantageModel
-                            advResv advSamples advOptim advLoss advModel
+                        // for each player
+                    (advStateMap, seq { 0 .. KuhnPoker.numPlayers - 1})
+                        ||> Seq.fold (fun advStateMap updatingPlayer ->
 
-                    printfn $"\nIter {iter}, Player {updatingPlayer}, Trained {advModel.IsTrained}"
-                    printfn "   Resulting model:"
-                    for infoSetKey in playerInfoSetKeys[updatingPlayer] do
-                        let advantages =
-                            (AdvantageModel.getAdvantage infoSetKey advModel)
-                                .data<float32>()
-                                |> Seq.toArray
-                        printfn "      %-3s: %s = %6.3f, %s = %6.3f (advantage)"
-                            infoSetKey
-                            KuhnPoker.actions[0]
-                            advantages[0]
-                            KuhnPoker.actions[1]
-                            advantages[1]
-                        let strategy =
-                            getStrategy infoSetKey advModel
-                        printfn "      %-3s: %s = %6.3f, %s = %6.3f (strategy)"
-                            infoSetKey
-                            KuhnPoker.actions[0]
-                            strategy[0]
-                            KuhnPoker.actions[1]
-                            strategy[1]
+                            let advModel, advOptim, advResv =
+                                let state = advStateMap[updatingPlayer]
+                                state.Model, state.Optimizer, state.Reservoir
 
-                    AdvantageState.updateMap
-                        updatingPlayer advModel advOptim advResv advStateMap)
-        ()
+                            let advSamples, stratSamples =
+                                Choice.unzip [|
+                                    for _ = 0 to numTraversals - 1 do
+                                        let deal =
+                                            let iDeal = rng.Next(KuhnPoker.allDeals.Length)
+                                            KuhnPoker.allDeals[iDeal]
+                                        yield! traverse
+                                            iter deal updatingPlayer advModel
+                                |]
+
+                                // update advantages
+                            let advResv, advModel =
+                                updateAdvantageModel
+                                    advResv advSamples advOptim advLoss advModel
+
+                            AdvantageState.updateMap
+                                updatingPlayer advModel advOptim advResv advStateMap))
+
+        advStateMap.Values
+            |> Seq.map (fun advState -> advState.Model)
+            |> Seq.toArray
 
 module Program =
 
     /// Number of CFR iterations to perform.
-    let private numIterations = 100
+    let private numIterations = 50
 
     /// Number of deals to traverse during each iteration.
     let private numTraversals = 40
+
+    let private playerInfoSetKeys =
+        [|
+            [| "J"; "Q"; "K"; "Jcb"; "Qcb"; "Kcb" |]
+            [| "Jb"; "Jc"; "Qb"; "Qc"; "Kb"; "Kc" |]
+        |]
 
     let run () =
 
@@ -267,7 +247,20 @@ module Program =
 
             // train
         printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations"
-        KuhnCfrTrainer.train numIterations numTraversals
+        let advModels = KuhnCfrTrainer.train numIterations numTraversals
+
+        for player = 0 to KuhnPoker.numPlayers - 1 do
+            printfn $"\nPlayer {player}"
+            let advModel = advModels[player]
+            for infoSetKey in playerInfoSetKeys[player] do
+                let strategy =
+                    KuhnCfrTrainer.getStrategy infoSetKey advModel
+                printfn "   %-3s: %s = %.3f, %s = %.3f"
+                    infoSetKey
+                    KuhnPoker.actions[0]
+                    strategy[0]
+                    KuhnPoker.actions[1]
+                    strategy[1]
 
     let timer = Diagnostics.Stopwatch.StartNew()
     run ()
