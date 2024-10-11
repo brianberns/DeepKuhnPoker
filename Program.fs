@@ -152,13 +152,13 @@ module KuhnCfrTrainer =
         loop "" |> snd
 
     let private hiddenSize = 16
-    let private learningRate = 0.01
-    let private reservoirCapacity = 1000
+    let private learningRate = 1e-3
+    let private reservoirCapacity = int 1e7
     let private numModelTrainSteps = 20
 
     /// Number of samples to use from the reservoir at each
     /// step of training.
-    let private numSamples = reservoirCapacity
+    let private numSamples = 128
 
     /// Adds the given samples to the given reservoir and
     /// then uses the reservoir to train the given model.
@@ -228,23 +228,6 @@ module KuhnCfrTrainer =
                             advResv advSamples advOptim advLoss advModel
 
                     printfn $"\nIter {iter}, Player {updatingPlayer}, Trained {advModel.IsTrained}"
-                    printfn "   Training data:"
-                    let sorted =
-                        advSamples
-                            |> Seq.sortBy (fun sample ->
-                                sample.InfoSetKey.Length,
-                                List.findIndex (fun card ->
-                                    card = sample.InfoSetKey[0..0])
-                                    KuhnPoker.deck,
-                                sample.InfoSetKey)
-                    for sample in sorted do
-                        printfn "      %-3s: %s = %6.3f, %s = %6.3f (%d)"
-                            sample.InfoSetKey
-                            KuhnPoker.actions[0]
-                            sample.Regrets[0]
-                            KuhnPoker.actions[1]
-                            sample.Regrets[1]
-                            sample.Iteration
                     printfn "   Resulting model:"
                     for infoSetKey in playerInfoSetKeys[updatingPlayer] do
                         let advantages =
@@ -273,10 +256,10 @@ module KuhnCfrTrainer =
 module Program =
 
     /// Number of CFR iterations to perform.
-    let private numIterations = 10
+    let private numIterations = 100
 
     /// Number of deals to traverse during each iteration.
-    let private numTraversals = 10 * KuhnPoker.allDeals.Length
+    let private numTraversals = 40
 
     let run () =
 
