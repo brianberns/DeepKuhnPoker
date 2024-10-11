@@ -186,14 +186,14 @@ module KuhnCfrTrainer =
     let private trainIteration
         numTraversals iter advLoss (advStateMap : Map<_, _>) =
 
-            // for each player
+            // train each player's model
         (advStateMap, seq { 0 .. KuhnPoker.numPlayers - 1})
             ||> Seq.fold (fun advStateMap updatingPlayer ->
 
+                    // run traversals for this player
                 let advModel, advOptim, advResv =
                     let state = advStateMap[updatingPlayer]
                     state.Model, state.Optimizer, state.Reservoir
-
                 let advSamples, stratSamples =
                     Choice.unzip [|
                         for _ = 0 to numTraversals - 1 do
@@ -204,11 +204,10 @@ module KuhnCfrTrainer =
                                 iter deal updatingPlayer advModel
                     |]
 
-                    // update advantages
+                    // update model
                 let advResv, advModel =
                     updateAdvantageModel
                         advResv advSamples advOptim advLoss advModel
-
                 AdvantageState.updateMap
                     updatingPlayer advModel advOptim advResv advStateMap)
 
@@ -221,7 +220,7 @@ module KuhnCfrTrainer =
                 hiddenSize learningRate rng reservoirCapacity
         let advLoss = torch.nn.MSELoss()
 
-            // iterate
+            // run the iterations
         let advStateMap =
             (advStateMap, seq { 0 .. numIterations - 1 })
                 ||> Seq.fold (fun advStateMap iter ->
