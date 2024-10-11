@@ -20,6 +20,29 @@ module Choice =
         Seq.choose fst opts,
         Seq.choose snd opts
 
+[<AutoOpen>]
+module Settings =
+
+    let settings =
+        {|
+            /// Random number generator.
+            Random = Random(0)
+
+            HiddenSize = 16
+            LearningRate = 1e-3
+            ReservoirCapacity = int 1e7
+            NumModelTrainSteps = 20
+
+            /// Number of samples to use from the reservoir at each
+            /// step of training.
+            NumSamples = 128
+
+            /// Number of deals to traverse during each iteration.
+            NumTraversals = 40
+
+            NumIterations = 50
+        |}
+
 /// State required to train advantage models.
 type private AdvantageState =
     {
@@ -36,19 +59,20 @@ type private AdvantageState =
 module private AdvantageState =
 
     /// Initializes advantage state for each player.
-    let createMap
-        hiddenSize learningRate rng reservoirCapacity =
+    let createMap () =
         Seq.init KuhnPoker.numPlayers (fun player ->
             let state =
-                let model = AdvantageModel.create hiddenSize
+                let model = AdvantageModel.create settings.HiddenSize
                 {
                     Model = model
                     Optimizer =
                         torch.optim.Adam(
                             model.Network.parameters(),
-                            lr = learningRate)
+                            lr = settings.LearningRate)
                     Reservoir =
-                        Reservoir.create rng reservoirCapacity
+                        Reservoir.create
+                            settings.Random
+                            settings.ReservoirCapacity
                 }
             player, state)
             |> Map
@@ -65,9 +89,6 @@ module private AdvantageState =
         Map.add player state stateMap
 
 module KuhnCfrTrainer =
-
-    /// Random number generator.
-    let private rng = Random(0)
 
     /// Computes strategy for the given info set using the
     /// given advantage model.
@@ -138,7 +159,7 @@ module KuhnCfrTrainer =
                         strategy
                             |> Seq.map float   // ugly
                             |> Seq.toArray
-                    Categorical.Sample(rng, strategy')
+                    Categorical.Sample(settings.Random, strategy')
                         |> Array.get KuhnPoker.actions
                 let utility, samples =
                     loop (history + action)
@@ -151,14 +172,6 @@ module KuhnCfrTrainer =
 
         loop "" |> snd
 
-    let private hiddenSize = 16
-    let private learningRate = 1e-3
-    let private reservoirCapacity = int 1e7
-    let private numModelTrainSteps = 20
-
-    /// Number of samples to use from the reservoir at each
-    /// step of training.
-    let private numSamples = 128
 
     /// Adds the given samples to the given reservoir and
     /// then uses the reservoir to train the given model.
@@ -173,10 +186,10 @@ module KuhnCfrTrainer =
 
             // train model
         let model =
-            (model, seq { 1 .. numModelTrainSteps })
+            (model, seq { 1 .. settings.NumModelTrainSteps })
                 ||> Seq.fold (fun model _ ->
                     let samples =
-                        Reservoir.sample numSamples resv
+                        Reservoir.sample settings.NumSamples resv
                     AdvantageModel.train
                         samples optim loss model)
 
@@ -184,7 +197,7 @@ module KuhnCfrTrainer =
 
     /// Trains a single iteration.
     let private trainIteration
-        numTraversals iter advLoss (advStateMap : Map<_, _>) =
+        iter advLoss (advStateMap : Map<_, _>) =
 
             // train each player's model
         (advStateMap, seq { 0 .. KuhnPoker.numPlayers - 1})
@@ -196,9 +209,10 @@ module KuhnCfrTrainer =
                     state.Model, state.Optimizer, state.Reservoir
                 let advSamples, stratSamples =
                     Choice.unzip [|
-                        for _ = 0 to numTraversals - 1 do
+                        for _ = 1 to settings.NumTraversals do
                             let deal =
-                                let iDeal = rng.Next(KuhnPoker.allDeals.Length)
+                                let iDeal =
+                                    settings.Random.Next(KuhnPoker.allDeals.Length)
                                 KuhnPoker.allDeals[iDeal]
                             yield! traverse
                                 iter deal updatingPlayer advModel
@@ -212,32 +226,23 @@ module KuhnCfrTrainer =
                     updatingPlayer advModel advOptim advResv advStateMap)
 
     /// Trains for the given number of iterations.
-    let train numIterations numTraversals =
+    let train () =
 
             // create advantage model
-        let advStateMap =
-            AdvantageState.createMap
-                hiddenSize learningRate rng reservoirCapacity
+        let advStateMap = AdvantageState.createMap ()
         let advLoss = torch.nn.MSELoss()
 
             // run the iterations
         let advStateMap =
-            (advStateMap, seq { 0 .. numIterations - 1 })
+            (advStateMap, seq { 0 .. settings.NumIterations - 1 })
                 ||> Seq.fold (fun advStateMap iter ->
-                    trainIteration
-                        numTraversals iter advLoss advStateMap)
+                    trainIteration iter advLoss advStateMap)
 
         advStateMap.Values
             |> Seq.map (fun advState -> advState.Model)
             |> Seq.toArray
 
 module Program =
-
-    /// Number of CFR iterations to perform.
-    let private numIterations = 50
-
-    /// Number of deals to traverse during each iteration.
-    let private numTraversals = 40
 
     let private playerInfoSetKeys =
         [|
@@ -250,8 +255,9 @@ module Program =
         torch.manual_seed(0) |> ignore
 
             // train
-        printfn $"Running Kuhn Poker Deep CFR for {numIterations} iterations"
-        let advModels = KuhnCfrTrainer.train numIterations numTraversals
+        printfn "Running Kuhn Poker Deep CFR for %A iterations"
+            settings.NumIterations
+        let advModels = KuhnCfrTrainer.train ()
 
         for player = 0 to KuhnPoker.numPlayers - 1 do
             printfn $"\nPlayer {player}"
