@@ -161,8 +161,7 @@ module KuhnCfrTrainer =
                             |> Seq.toArray
                     Categorical.Sample(settings.Random, strategy')
                         |> Array.get KuhnPoker.actions
-                let utility, samples =
-                    loop (history + action)
+                let utility, samples = loop (history + action)
                 let sample =
                     StrategySample.create
                         infoSetKey
@@ -171,7 +170,6 @@ module KuhnCfrTrainer =
                 -utility, append samples sample
 
         loop "" |> snd
-
 
     /// Adds the given samples to the given reservoir and
     /// then uses the reservoir to train the given model.
@@ -199,11 +197,11 @@ module KuhnCfrTrainer =
     let private trainIteration
         iter advLoss (advStateMap : Map<_, _>) =
 
-            // train each player's model
+            // train each player's model once
         (advStateMap, seq { 0 .. KuhnPoker.numPlayers - 1})
             ||> Seq.fold (fun advStateMap updatingPlayer ->
 
-                    // run traversals for this player
+                    // generate training data for this player
                 let advModel, advOptim, advResv =
                     let state = advStateMap[updatingPlayer]
                     state.Model, state.Optimizer, state.Reservoir
