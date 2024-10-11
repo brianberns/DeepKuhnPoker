@@ -182,6 +182,36 @@ module KuhnCfrTrainer =
 
         resv, model
 
+    /// Trains a single iteration.
+    let private trainIteration
+        numTraversals iter advLoss (advStateMap : Map<_, _>) =
+
+            // for each player
+        (advStateMap, seq { 0 .. KuhnPoker.numPlayers - 1})
+            ||> Seq.fold (fun advStateMap updatingPlayer ->
+
+                let advModel, advOptim, advResv =
+                    let state = advStateMap[updatingPlayer]
+                    state.Model, state.Optimizer, state.Reservoir
+
+                let advSamples, stratSamples =
+                    Choice.unzip [|
+                        for _ = 0 to numTraversals - 1 do
+                            let deal =
+                                let iDeal = rng.Next(KuhnPoker.allDeals.Length)
+                                KuhnPoker.allDeals[iDeal]
+                            yield! traverse
+                                iter deal updatingPlayer advModel
+                    |]
+
+                    // update advantages
+                let advResv, advModel =
+                    updateAdvantageModel
+                        advResv advSamples advOptim advLoss advModel
+
+                AdvantageState.updateMap
+                    updatingPlayer advModel advOptim advResv advStateMap)
+
     /// Trains for the given number of iterations.
     let train numIterations numTraversals =
 
@@ -191,37 +221,12 @@ module KuhnCfrTrainer =
                 hiddenSize learningRate rng reservoirCapacity
         let advLoss = torch.nn.MSELoss()
 
+            // iterate
         let advStateMap =
-
-                // for each iteration
             (advStateMap, seq { 0 .. numIterations - 1 })
                 ||> Seq.fold (fun advStateMap iter ->
-
-                        // for each player
-                    (advStateMap, seq { 0 .. KuhnPoker.numPlayers - 1})
-                        ||> Seq.fold (fun advStateMap updatingPlayer ->
-
-                            let advModel, advOptim, advResv =
-                                let state = advStateMap[updatingPlayer]
-                                state.Model, state.Optimizer, state.Reservoir
-
-                            let advSamples, stratSamples =
-                                Choice.unzip [|
-                                    for _ = 0 to numTraversals - 1 do
-                                        let deal =
-                                            let iDeal = rng.Next(KuhnPoker.allDeals.Length)
-                                            KuhnPoker.allDeals[iDeal]
-                                        yield! traverse
-                                            iter deal updatingPlayer advModel
-                                |]
-
-                                // update advantages
-                            let advResv, advModel =
-                                updateAdvantageModel
-                                    advResv advSamples advOptim advLoss advModel
-
-                            AdvantageState.updateMap
-                                updatingPlayer advModel advOptim advResv advStateMap))
+                    trainIteration
+                        numTraversals iter advLoss advStateMap)
 
         advStateMap.Values
             |> Seq.map (fun advState -> advState.Model)
