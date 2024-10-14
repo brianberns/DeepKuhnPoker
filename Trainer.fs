@@ -40,9 +40,9 @@ module Trainer =
 
     /// Computes strategy for the given info set using the
     /// given advantage model.
-    let getStrategy infoSetKey (advModel : AdvantageModel) =
+    let getStrategy infoSetKey model =
         use _ = torch.no_grad()   // use model.eval() instead?
-        (AdvantageModel.getAdvantage infoSetKey advModel)
+        (AdvantageModel.getAdvantage infoSetKey model)
             .data<float32>()
             |> DenseVector.ofSeq
             |> InformationSet.getStrategy
@@ -54,8 +54,7 @@ module Trainer =
             |> DenseVector.ofSeq
 
     /// Evaluates the utility of the given deal.
-    let private traverse
-        iter deal updatingPlayer (advModels : AdvantageModel[]) =
+    let private traverse iter deal updatingPlayer (models : _[]) =
 
         /// Appends an item to the end of an array.
         let append items item =
@@ -78,7 +77,7 @@ module Trainer =
 
                 // get active player's current strategy for this info set
             let strategy =
-                getStrategy infoSetKey advModels[activePlayer]
+                getStrategy infoSetKey models[activePlayer]
 
                 // get utility of this info set
             if activePlayer = updatingPlayer then
@@ -121,8 +120,7 @@ module Trainer =
 
     /// Adds the given samples to the given reservoir and
     /// then uses the reservoir to train the given model.
-    let private trainAdvantageModel
-        resv newSamples (model : AdvantageModel) =
+    let private trainAdvantageModel resv newSamples model =
 
             // update reservoir
         let resv = Reservoir.addMany newSamples resv
@@ -136,13 +134,12 @@ module Trainer =
         resv
 
     /// Trains a single iteration.
-    let private trainIteration
-        iter advModels (advResvMap : Map<_, _>) =
+    let private trainIteration iter models (resvMap : Map<_, _>) =
 
             // train each player's model once
-        let stratSampleSeqs, advResvMap =
-            (advResvMap, seq { 0 .. KuhnPoker.numPlayers - 1})
-                ||> Seq.mapFold (fun advResvMap updatingPlayer ->
+        let stratSampleSeqs, resvMap =
+            (resvMap, seq { 0 .. KuhnPoker.numPlayers - 1})
+                ||> Seq.mapFold (fun resvMap updatingPlayer ->
 
                         // generate training data for this player
                     let advSamples, stratSamples =
@@ -154,21 +151,21 @@ module Trainer =
                                             KuhnPoker.allDeals.Length)
                                     KuhnPoker.allDeals[iDeal]
                                 yield! traverse
-                                    iter deal updatingPlayer advModels
+                                    iter deal updatingPlayer models
                         |]
 
                         // train model
-                    let advResMap =
-                        let advResv =
+                    let resvMap =
+                        let resv =
                             trainAdvantageModel
-                                advResvMap[updatingPlayer]
+                                resvMap[updatingPlayer]
                                 advSamples
-                                advModels[updatingPlayer]
-                        Map.add updatingPlayer advResv advResvMap
+                                models[updatingPlayer]
+                        Map.add updatingPlayer resv resvMap
 
-                    stratSamples, advResMap)
+                    stratSamples, resvMap)
 
-        advResvMap, Seq.concat stratSampleSeqs
+        resvMap, Seq.concat stratSampleSeqs
 
     /// Trains for the given number of iterations.
     let train () =
