@@ -40,7 +40,7 @@ module Settings =
             /// Number of deals to traverse during each iteration.
             NumTraversals = 40
 
-            NumIterations = 50
+            NumIterations = 200
         |}
 
 /// State required to train advantage models.
@@ -106,7 +106,7 @@ module KuhnCfrTrainer =
             |> DenseVector.ofSeq
 
     /// Evaluates the utility of the given deal.
-    let private traverse iter deal updatingPlayer model =
+    let private traverse iter deal updatingPlayer (advStateMap : Map<int, AdvantageState>) =
 
         /// Appends an item to the end of an array.
         let append items item =
@@ -127,8 +127,10 @@ module KuhnCfrTrainer =
             let activePlayer = KuhnPoker.getActivePlayer history
             let infoSetKey = deal[activePlayer] + history
 
-                // get player's current strategy for this info set
-            let strategy = getStrategy infoSetKey model
+                // get active player's current strategy for this info set
+            let strategy =
+                let advModel = advStateMap[activePlayer].Model
+                getStrategy infoSetKey advModel
 
                 // get utility of this info set
             if activePlayer = updatingPlayer then
@@ -202,9 +204,6 @@ module KuhnCfrTrainer =
             ||> Seq.fold (fun advStateMap updatingPlayer ->
 
                     // generate training data for this player
-                let advModel, advOptim, advResv =
-                    let state = advStateMap[updatingPlayer]
-                    state.Model, state.Optimizer, state.Reservoir
                 let advSamples, stratSamples =
                     Choice.unzip [|
                         for _ = 1 to settings.NumTraversals do
@@ -213,10 +212,13 @@ module KuhnCfrTrainer =
                                     settings.Random.Next(KuhnPoker.allDeals.Length)
                                 KuhnPoker.allDeals[iDeal]
                             yield! traverse
-                                iter deal updatingPlayer advModel
+                                iter deal updatingPlayer advStateMap
                     |]
 
                     // update model
+                let advModel, advOptim, advResv =
+                    let state = advStateMap[updatingPlayer]
+                    state.Model, state.Optimizer, state.Reservoir
                 let advResv, advModel =
                     updateAdvantageModel
                         advResv advSamples advOptim advLoss advModel
