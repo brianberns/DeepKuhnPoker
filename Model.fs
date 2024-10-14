@@ -17,10 +17,11 @@ module Model =
 
     /// Invokes the given model for the given info set.
     let invoke infoSetKey (model : Model) =
-        (infoSetKey
-            |> KuhnPoker.Encoding.encodeInput
-            |> torch.tensor)
-            --> model
+        use input =
+            infoSetKey
+                |> KuhnPoker.Encoding.encodeInput
+                |> torch.tensor
+        input --> model
 
 /// An observed advantage event.
 type AdvantageSample =
@@ -125,5 +126,4 @@ module StrategyModel =
             ReLU(),
             Linear(hiddenSize, hiddenSize),
             ReLU(),
-            Linear(hiddenSize, Model.outputSize),
-            Softmax(dim = 1))
+            Linear(hiddenSize, Model.outputSize))
