@@ -20,17 +20,35 @@ module Choice =
         Seq.choose fst opts,
         Seq.choose snd opts
 
+module Vector =
+
+    /// Samples a strategy.
+    let sample rng (strategy : Vector<_>) =
+        let strategy' =
+            strategy
+                |> Seq.map float   // ugly
+                |> Seq.toArray
+        Categorical.Sample(rng, strategy')
+
 [<AutoOpen>]
 module Settings =
 
+    /// Hyperparameters.
     let settings =
         {|
             /// Random number generator.
             Random = Random(0)
 
+            /// Maximum number of samples stored in a reservoir.
+            ReservoirCapacity = 10_000_000
+
+            /// Size of a neural network hidden layer.
             HiddenSize = 16
+
+            /// Optimizer learning rate.
             LearningRate = 1e-3
-            ReservoirCapacity = int 1e7
+
+            /// Number of steps to use when training models.
             NumModelTrainSteps = 20
 
             /// Number of samples to use from the reservoir at each
@@ -40,6 +58,7 @@ module Settings =
             /// Number of deals to traverse during each iteration.
             NumTraversals = 40
 
+            /// Number of iterations to perform.
             NumIterations = 400
         |}
 
@@ -62,10 +81,7 @@ module KuhnCfrTrainer =
 
     /// Evaluates the utility of the given deal.
     let private traverse
-        iter
-        deal
-        updatingPlayer
-        (advModels : AdvantageModel[]) =
+        iter deal updatingPlayer (advModels : AdvantageModel[]) =
 
         /// Appends an item to the end of an array.
         let append items item =
@@ -114,14 +130,12 @@ module KuhnCfrTrainer =
 
             else
                     // sample a single action according to the strategy
-                let action =
-                    let strategy' =
+                let utility, samples =
+                    let action =
                         strategy
-                            |> Seq.map float   // ugly
-                            |> Seq.toArray
-                    Categorical.Sample(settings.Random, strategy')
-                        |> Array.get KuhnPoker.actions
-                let utility, samples = loop (history + action)
+                            |> Vector.sample settings.Random
+                            |> Array.get KuhnPoker.actions
+                    loop (history + action)
                 let sample =
                     StrategySample.create
                         infoSetKey
