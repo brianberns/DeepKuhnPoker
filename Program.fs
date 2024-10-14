@@ -1,10 +1,7 @@
 ﻿namespace DeepKuhnPoker
 
 open System
-
-open MathNet.Numerics.Distributions
 open MathNet.Numerics.LinearAlgebra
-
 open TorchSharp
 
 module Choice =
@@ -21,6 +18,8 @@ module Choice =
         Seq.choose snd opts
 
 module Vector =
+
+    open MathNet.Numerics.Distributions
 
     /// Samples a strategy.
     let sample rng (strategy : Vector<_>) =
@@ -147,12 +146,12 @@ module KuhnCfrTrainer =
 
     /// Adds the given samples to the given reservoir and
     /// then uses the reservoir to train the given model.
-    let private updateAdvantageModel
-        reservoir newSamples (model : AdvantageModel) =
+    let private trainAdvantageModel
+        resv newSamples (model : AdvantageModel) =
 
             // update reservoir
         let resv =
-            (reservoir, newSamples)
+            (resv, newSamples)
                 ||> Seq.fold (fun resv advSample ->
                     Reservoir.add advSample resv)
 
@@ -171,7 +170,8 @@ module KuhnCfrTrainer =
         resv
 
     /// Trains a single iteration.
-    let private trainIteration iter advModels (advResvMap : Map<_, _>) =
+    let private trainIteration
+        iter advModels (advResvMap : Map<_, _>) =
 
             // train each player's model once
         (advResvMap, seq { 0 .. KuhnPoker.numPlayers - 1})
@@ -190,9 +190,9 @@ module KuhnCfrTrainer =
                                 iter deal updatingPlayer advModels
                     |]
 
-                    // update model
+                    // train model
                 let advResv =
-                    updateAdvantageModel
+                    trainAdvantageModel
                         advResvMap[updatingPlayer]
                         advSamples
                         advModels[updatingPlayer]
