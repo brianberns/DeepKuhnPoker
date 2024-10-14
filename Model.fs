@@ -5,7 +5,7 @@ open type torch.nn
 
 open MathNet.Numerics.LinearAlgebra
 
-type Network = Module<torch.Tensor, torch.Tensor>
+type Model = Module<torch.Tensor, torch.Tensor>
 
 module private Network =
 
@@ -37,39 +37,38 @@ module AdvantageSample =
             Iteration = iteration
         }
 
-type AdvantageModel =
-    {
-        Network : Network
-    }
+type AdvantageModel = Model
 
 module AdvantageModel =
 
     /// Creates an advantage model.
     let create hiddenSize : AdvantageModel =
-        {
-            Network =
-                Sequential(
-                    Linear(Network.inputSize, hiddenSize),
-                    ReLU(),
-                    Linear(hiddenSize, hiddenSize),
-                    ReLU(),
-                    Linear(hiddenSize, Network.outputSize))
-        }
+        Sequential(
+            Linear(Network.inputSize, hiddenSize),
+            ReLU(),
+            Linear(hiddenSize, hiddenSize),
+            ReLU(),
+            Linear(hiddenSize, Network.outputSize))
 
     /// Gets the advantage for the given info set.
-    let getAdvantage infoSetKey model =
+    let getAdvantage infoSetKey (model : AdvantageModel) =
         (infoSetKey
             |> KuhnPoker.Encoding.encodeInput
             |> torch.tensor)
-            --> model.Network
+            --> model
 
-    let train samples optimizer criterion model =
+    /// Trains the given model using the given samples.
+    let train
+        (samples : seq<AdvantageSample>)
+        (optimizer : torch.optim.Optimizer)
+        (criterion : Loss<_, _, torch.Tensor>)
+        (model : AdvantageModel) =
 
             // forward pass
         let loss =
             let inputs =
                 samples
-                    |> Seq.map (fun (sample : AdvantageSample) ->
+                    |> Seq.map (fun sample ->
                         sample.InfoSetKey
                             |> KuhnPoker.Encoding.encodeInput)
                     |> array2D
@@ -89,8 +88,8 @@ module AdvantageModel =
                             |> Seq.singleton )
                     |> array2D
                     |> torch.tensor
-            let outputs = inputs --> model.Network
-            (criterion : Loss<_, _, torch.Tensor>).forward(
+            let outputs = inputs --> model
+            criterion.forward(
                 iters * outputs,   // favor newer iterations
                 iters * targets)
 
@@ -117,7 +116,7 @@ module StrategySample =
             Iteration = iteration
         }
 
-type StrategyModel = Network
+type StrategyModel = Model
 
 module StrategyModel =
 

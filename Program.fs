@@ -40,7 +40,7 @@ module Settings =
             /// Number of deals to traverse during each iteration.
             NumTraversals = 40
 
-            NumIterations = 200
+            NumIterations = 400
         |}
 
 /// State required to train advantage models.
@@ -67,7 +67,7 @@ module private AdvantageState =
                     Model = model
                     Optimizer =
                         torch.optim.Adam(
-                            model.Network.parameters(),
+                            model.parameters(),
                             lr = settings.LearningRate)
                     Reservoir =
                         Reservoir.create
@@ -222,6 +222,12 @@ module KuhnCfrTrainer =
                 let advResv, advModel =
                     updateAdvantageModel
                         advResv advSamples advOptim advLoss advModel
+
+                if updatingPlayer = 0 then
+                    printfn "%A, %f"
+                        iter
+                        ((getStrategy "Qcb" advModel)[0])
+
                 AdvantageState.updateMap
                     updatingPlayer advModel advOptim advResv advStateMap)
 
