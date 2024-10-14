@@ -128,16 +128,10 @@ module Trainer =
         let resv = Reservoir.addMany newSamples resv
 
             // train model
-        use optim =
-            torch.optim.Adam(
-                model.Network.parameters(),
-                lr = settings.LearningRate)
-        use loss = torch.nn.MSELoss()
         for _ = 1 to settings.NumModelTrainSteps do
             let samples =
                 Reservoir.sample settings.NumSamples resv
-            AdvantageModel.train
-                samples optim loss model
+            AdvantageModel.train samples model
 
         resv
 
@@ -184,7 +178,9 @@ module Trainer =
             // create advantage model
         let advModels =
             Array.init KuhnPoker.numPlayers (fun _ ->
-                AdvantageModel.create settings.HiddenSize)
+                AdvantageModel.create
+                    settings.HiddenSize
+                    settings.LearningRate)
         let advResvMap =
             Seq.init KuhnPoker.numPlayers (fun player ->
                 let resv =

@@ -40,12 +40,14 @@ module AdvantageSample =
 type AdvantageModel =
     {
         Network : Network
+        Optimizer : torch.optim.Optimizer
+        Loss : Loss<torch.Tensor, torch.Tensor, torch.Tensor>
     }
 
 module AdvantageModel =
 
     /// Creates an advantage model.
-    let create hiddenSize : AdvantageModel =
+    let create hiddenSize learningRate : AdvantageModel =
         let network =
             Sequential(
                 Linear(Network.inputSize, hiddenSize),
@@ -53,7 +55,14 @@ module AdvantageModel =
                 Linear(hiddenSize, hiddenSize),
                 ReLU(),
                 Linear(hiddenSize, Network.outputSize))
-        { Network = network }
+        {
+            Network = network
+            Optimizer =
+                torch.optim.Adam(
+                    network.parameters(),
+                    lr = learningRate)
+            Loss = torch.nn.MSELoss()
+        }
 
     /// Gets the advantage for the given info set.
     let getAdvantage infoSetKey model =
@@ -65,8 +74,6 @@ module AdvantageModel =
     /// Trains the given model using the given samples.
     let train
         (samples : seq<AdvantageSample>)
-        (optimizer : torch.optim.Optimizer)
-        (criterion : Loss<_, _, torch.Tensor>)
         (model : AdvantageModel) =
 
             // forward pass
@@ -94,14 +101,14 @@ module AdvantageModel =
                     |> array2D
                     |> torch.tensor
             let outputs = inputs --> model.Network
-            criterion.forward(
+            model.Loss.forward(
                 iters * outputs,   // favor newer iterations
                 iters * targets)
 
             // backward pass and optimize
-        (optimizer : torch.optim.Optimizer).zero_grad()
+        model.Optimizer.zero_grad()
         loss.backward()
-        optimizer.step() |> ignore
+        model.Optimizer.step() |> ignore
 
 type StrategySample =
     {
