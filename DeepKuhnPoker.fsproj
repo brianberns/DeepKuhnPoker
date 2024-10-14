@@ -6,10 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Prelude.fs" />
     <Compile Include="Reservoir.fs" />
     <Compile Include="KuhnPoker.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="InformationSet.fs" />
+    <Compile Include="Trainer.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
