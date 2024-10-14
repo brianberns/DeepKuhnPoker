@@ -5,23 +5,15 @@ open type torch.nn
 
 open MathNet.Numerics.LinearAlgebra
 
-type Model = Module<torch.Tensor, torch.Tensor>
+type Network = Module<torch.Tensor, torch.Tensor>
 
-module Model =
+module Network =
 
     /// Length of neural network input.
     let inputSize = KuhnPoker.Encoding.encodedLength
 
     /// Length of neural network output.
     let outputSize = KuhnPoker.actions.Length
-
-    /// Invokes the given model for the given info set.
-    let invoke infoSetKey (model : Model) =
-        use input =
-            infoSetKey
-                |> KuhnPoker.Encoding.encodeInput
-                |> torch.tensor
-        input --> model
 
 /// An observed advantage event.
 type AdvantageSample =
@@ -45,18 +37,30 @@ module AdvantageSample =
             Iteration = iteration
         }
 
-type AdvantageModel = Model
+type AdvantageModel =
+    {
+        Network : Network
+    }
 
 module AdvantageModel =
 
     /// Creates an advantage model.
     let create hiddenSize : AdvantageModel =
-        Sequential(
-            Linear(Model.inputSize, hiddenSize),
-            ReLU(),
-            Linear(hiddenSize, hiddenSize),
-            ReLU(),
-            Linear(hiddenSize, Model.outputSize))
+        let network =
+            Sequential(
+                Linear(Network.inputSize, hiddenSize),
+                ReLU(),
+                Linear(hiddenSize, hiddenSize),
+                ReLU(),
+                Linear(hiddenSize, Network.outputSize))
+        { Network = network }
+
+    /// Gets the advantage for the given info set.
+    let getAdvantage infoSetKey model =
+        (infoSetKey
+            |> KuhnPoker.Encoding.encodeInput
+            |> torch.tensor)
+            --> model.Network
 
     /// Trains the given model using the given samples.
     let train
@@ -89,7 +93,7 @@ module AdvantageModel =
                             |> Seq.singleton )
                     |> array2D
                     |> torch.tensor
-            let outputs = inputs --> model
+            let outputs = inputs --> model.Network
             criterion.forward(
                 iters * outputs,   // favor newer iterations
                 iters * targets)
@@ -115,15 +119,20 @@ module StrategySample =
             Iteration = iteration
         }
 
-type StrategyModel = Model
+type StrategyModel =
+    {
+        Network : Network
+    }
 
 module StrategyModel =
 
     /// Creates a strategy model.
     let create hiddenSize : StrategyModel =
-        Sequential(
-            Linear(Model.inputSize, hiddenSize),
-            ReLU(),
-            Linear(hiddenSize, hiddenSize),
-            ReLU(),
-            Linear(hiddenSize, Model.outputSize))
+        let network =
+            Sequential(
+                Linear(Network.inputSize, hiddenSize),
+                ReLU(),
+                Linear(hiddenSize, hiddenSize),
+                ReLU(),
+                Linear(hiddenSize, Network.outputSize))
+        { Network = network }

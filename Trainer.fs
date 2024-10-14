@@ -33,7 +33,7 @@ module Settings =
             NumTraversals = 40
 
             /// Number of iterations to perform.
-            NumIterations = 400
+            NumIterations = 40
         |}
 
 module Trainer =
@@ -42,7 +42,7 @@ module Trainer =
     /// given advantage model.
     let getStrategy infoSetKey (advModel : AdvantageModel) =
         use _ = torch.no_grad()   // use model.eval() instead?
-        (Model.invoke infoSetKey advModel)
+        (AdvantageModel.getAdvantage infoSetKey advModel)
             .data<float32>()
             |> DenseVector.ofSeq
             |> InformationSet.getStrategy
@@ -130,7 +130,7 @@ module Trainer =
             // train model
         use optim =
             torch.optim.Adam(
-                model.parameters(),
+                model.Network.parameters(),
                 lr = settings.LearningRate)
         use loss = torch.nn.MSELoss()
         for _ = 1 to settings.NumModelTrainSteps do
