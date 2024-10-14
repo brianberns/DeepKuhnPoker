@@ -19,9 +19,9 @@ module Vector =
     open MathNet.Numerics.Distributions
 
     /// Samples a strategy.
-    let sample rng (strategy : Vector<float32>) =
+    let inline sample rng (strategy : Vector<_>) =
         let strategy' =
             strategy
-                |> Seq.map float   // ugly
+                |> Seq.map float
                 |> Seq.toArray
         Categorical.Sample(rng, strategy')
