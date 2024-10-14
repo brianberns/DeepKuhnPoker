@@ -39,7 +39,6 @@ module AdvantageSample =
 
 type AdvantageModel =
     {
-        IsTrained : bool
         Network : Network
     }
 
@@ -48,7 +47,6 @@ module AdvantageModel =
     /// Creates an advantage model.
     let create hiddenSize : AdvantageModel =
         {
-            IsTrained = false
             Network =
                 Sequential(
                     Linear(Network.inputSize, hiddenSize),
@@ -60,13 +58,10 @@ module AdvantageModel =
 
     /// Gets the advantage for the given info set.
     let getAdvantage infoSetKey model =
-        if model.IsTrained then
-            (infoSetKey
-                |> KuhnPoker.Encoding.encodeInput
-                |> torch.tensor)
-                --> model.Network
-        else
-            torch.ones(Network.outputSize)   // uniform
+        (infoSetKey
+            |> KuhnPoker.Encoding.encodeInput
+            |> torch.tensor)
+            --> model.Network
 
     let train samples optimizer criterion model =
 
@@ -104,7 +99,7 @@ module AdvantageModel =
         loss.backward()
         optimizer.step() |> ignore
 
-        { model with IsTrained = true }
+        model
 
 type StrategySample =
     {
