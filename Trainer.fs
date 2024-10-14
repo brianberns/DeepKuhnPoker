@@ -40,9 +40,9 @@ module Trainer =
 
     /// Computes strategy for the given info set using the
     /// given advantage model.
-    let getStrategy infoSetKey model =
+    let getStrategy infoSetKey (advModel : AdvantageModel) =
         use _ = torch.no_grad()   // use model.eval() instead?
-        (AdvantageModel.getAdvantage infoSetKey model)
+        (Model.invoke infoSetKey advModel)
             .data<float32>()
             |> DenseVector.ofSeq
             |> InformationSet.getStrategy
@@ -125,10 +125,7 @@ module Trainer =
         resv newSamples (model : AdvantageModel) =
 
             // update reservoir
-        let resv =
-            (resv, newSamples)
-                ||> Seq.fold (fun resv advSample ->
-                    Reservoir.add advSample resv)
+        let resv = Reservoir.addMany newSamples resv
 
             // train model
         use optim =
@@ -149,41 +146,42 @@ module Trainer =
         iter advModels (advResvMap : Map<_, _>) =
 
             // train each player's model once
-        (advResvMap, seq { 0 .. KuhnPoker.numPlayers - 1})
-            ||> Seq.fold (fun advResvMap updatingPlayer ->
+        let stratSampleSeqs, advResvMap =
+            (advResvMap, seq { 0 .. KuhnPoker.numPlayers - 1})
+                ||> Seq.mapFold (fun advResvMap updatingPlayer ->
 
-                    // generate training data for this player
-                let advSamples, stratSamples =
-                    Choice.unzip [|
-                        for _ = 1 to settings.NumTraversals do
-                            let deal =
-                                let iDeal =
-                                    settings.Random.Next(
-                                        KuhnPoker.allDeals.Length)
-                                KuhnPoker.allDeals[iDeal]
-                            yield! traverse
-                                iter deal updatingPlayer advModels
-                    |]
+                        // generate training data for this player
+                    let advSamples, stratSamples =
+                        Choice.unzip [|
+                            for _ = 1 to settings.NumTraversals do
+                                let deal =
+                                    let iDeal =
+                                        settings.Random.Next(
+                                            KuhnPoker.allDeals.Length)
+                                    KuhnPoker.allDeals[iDeal]
+                                yield! traverse
+                                    iter deal updatingPlayer advModels
+                        |]
 
-                    // train model
-                let advResv =
-                    trainAdvantageModel
-                        advResvMap[updatingPlayer]
-                        advSamples
-                        advModels[updatingPlayer]
+                        // train model
+                    let advResMap =
+                        let advResv =
+                            trainAdvantageModel
+                                advResvMap[updatingPlayer]
+                                advSamples
+                                advModels[updatingPlayer]
+                        Map.add updatingPlayer advResv advResvMap
 
-                if updatingPlayer = 0 then
-                    printfn "%A, %f"
-                        iter
-                        ((getStrategy "Qcb" advModels[0])[0])
+                    stratSamples, advResMap)
 
-                Map.add updatingPlayer advResv advResvMap)
+        advResvMap, Seq.concat stratSampleSeqs
 
     /// Trains for the given number of iterations.
     let train () =
 
-            // create advantage model
         torch.manual_seed(0) |> ignore
+
+            // create advantage model
         let advModels =
             Array.init KuhnPoker.numPlayers (fun _ ->
                 AdvantageModel.create settings.HiddenSize)
@@ -196,10 +194,22 @@ module Trainer =
                 player, resv)
                 |> Map
 
-            // run the iterations
-        (advResvMap, seq { 0 .. settings.NumIterations - 1 })
-            ||> Seq.fold (fun advResvMap iter ->
-                trainIteration iter advModels advResvMap)
-            |> ignore
+            // create strategy model
+        let stratModel =
+            StrategyModel.create settings.HiddenSize
+        let stratResv =
+            Reservoir.create
+                settings.Random
+                settings.ReservoirCapacity
 
-        advModels
+            // run the iterations
+        let stratResv, _ =
+            ((advResvMap, stratResv), seq { 0 .. settings.NumIterations - 1 })
+                ||> Seq.fold (fun (advResvMap, stratResv) iter ->
+                    let advResvMap, stratSamples =
+                        trainIteration iter advModels advResvMap
+                    let stratResv =
+                        Reservoir.addMany stratSamples stratResv
+                    advResvMap, stratResv)
+
+        stratModel

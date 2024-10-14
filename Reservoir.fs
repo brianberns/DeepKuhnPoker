@@ -50,6 +50,13 @@ module Reservoir =
         { reservoir with
             Items = Map.add idx item reservoir.Items }
 
+    /// Adds the given items to the given reservior, replacing
+    /// existing items at random if necessary.
+    let addMany items reservoir =
+        (reservoir, items)
+            ||> Seq.fold (fun reservoir item ->
+                add item reservoir)
+
     /// Answers up to the given number of items from the given
     /// reservoir at random.
     let sample numSamples reservoir =

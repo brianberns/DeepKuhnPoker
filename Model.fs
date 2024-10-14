@@ -7,13 +7,20 @@ open MathNet.Numerics.LinearAlgebra
 
 type Model = Module<torch.Tensor, torch.Tensor>
 
-module private Network =
+module Model =
 
     /// Length of neural network input.
     let inputSize = KuhnPoker.Encoding.encodedLength
 
     /// Length of neural network output.
     let outputSize = KuhnPoker.actions.Length
+
+    /// Invokes the given model for the given info set.
+    let invoke infoSetKey (model : Model) =
+        (infoSetKey
+            |> KuhnPoker.Encoding.encodeInput
+            |> torch.tensor)
+            --> model
 
 /// An observed advantage event.
 type AdvantageSample =
@@ -44,18 +51,11 @@ module AdvantageModel =
     /// Creates an advantage model.
     let create hiddenSize : AdvantageModel =
         Sequential(
-            Linear(Network.inputSize, hiddenSize),
+            Linear(Model.inputSize, hiddenSize),
             ReLU(),
             Linear(hiddenSize, hiddenSize),
             ReLU(),
-            Linear(hiddenSize, Network.outputSize))
-
-    /// Gets the advantage for the given info set.
-    let getAdvantage infoSetKey (model : AdvantageModel) =
-        (infoSetKey
-            |> KuhnPoker.Encoding.encodeInput
-            |> torch.tensor)
-            --> model
+            Linear(hiddenSize, Model.outputSize))
 
     /// Trains the given model using the given samples.
     let train
@@ -121,7 +121,9 @@ module StrategyModel =
     /// Creates a strategy model.
     let create hiddenSize : StrategyModel =
         Sequential(
-            Linear(Network.inputSize, hiddenSize),
+            Linear(Model.inputSize, hiddenSize),
             ReLU(),
-            Linear(hiddenSize, Network.outputSize),
+            Linear(hiddenSize, hiddenSize),
+            ReLU(),
+            Linear(hiddenSize, Model.outputSize),
             Softmax(dim = 1))

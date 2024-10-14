@@ -16,14 +16,13 @@ module Program =
             // train
         printfn "Running Kuhn Poker Deep CFR for %A iterations"
             settings.NumIterations
-        let advModels = Trainer.train ()
+        let stratModel = Trainer.train ()
 
         for player = 0 to KuhnPoker.numPlayers - 1 do
             printfn $"\nPlayer {player}"
-            let advModel = advModels[player]
             for infoSetKey in playerInfoSetKeys[player] do
                 let strategy =
-                    Trainer.getStrategy infoSetKey advModel
+                    Trainer.getStrategy infoSetKey stratModel
                 printfn "   %-3s: %s = %.3f, %s = %.3f"
                     infoSetKey
                     KuhnPoker.actions[0]
