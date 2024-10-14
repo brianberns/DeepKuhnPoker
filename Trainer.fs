@@ -22,18 +22,25 @@ module Settings =
             /// Optimizer learning rate.
             LearningRate = 1e-3
 
-            /// Number of steps to use when training models.
-            NumModelTrainSteps = 20
+            /// Number of steps to use when training advantage models.
+            NumAdvantageModelTrainSteps = 20
 
-            /// Number of samples to use from the reservoir at each
-            /// step of training.
-            NumSamples = 128
+            /// Number of advantage samples to use from the reservoir
+            /// at each step of training.
+            NumAdvantageSamples = 128
 
             /// Number of deals to traverse during each iteration.
             NumTraversals = 40
 
             /// Number of iterations to perform.
             NumIterations = 40
+
+            /// Number of steps to use when training the strategy model.
+            NumStrategyModelTrainSteps = 400
+
+            /// Number of strategy samples to use from the reservoir
+            /// at each step of training.
+            NumStrategySamples = 1024
         |}
 
 module Trainer =
@@ -126,9 +133,11 @@ module Trainer =
         let resv = Reservoir.addMany newSamples resv
 
             // train model
-        for _ = 1 to settings.NumModelTrainSteps do
+        for _ = 1 to settings.NumAdvantageModelTrainSteps do
             let samples =
-                Reservoir.sample settings.NumSamples resv
+                Reservoir.sample
+                    settings.NumAdvantageSamples
+                    resv
             AdvantageModel.train samples model
 
         resv
