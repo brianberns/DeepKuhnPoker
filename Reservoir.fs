@@ -51,7 +51,7 @@ module Reservoir =
             Items = Map.add idx item reservoir.Items }
 
     /// Answers up to the given number of items from the given
-    /// reservoir at random, if possible.
+    /// reservoir at random.
     let sample numSamples reservoir =
         assert(isValid reservoir)
         let numSamples = min numSamples reservoir.Count
