@@ -53,6 +53,8 @@ module AdvantageModel =
                 Sequential(
                     Linear(Network.inputSize, hiddenSize),
                     ReLU(),
+                    Linear(hiddenSize, hiddenSize),
+                    ReLU(),
                     Linear(hiddenSize, Network.outputSize))
         }
 
