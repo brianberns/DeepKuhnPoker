@@ -102,7 +102,11 @@ module KuhnCfrTrainer =
             |> DenseVector.ofSeq
 
     /// Evaluates the utility of the given deal.
-    let private traverse iter deal updatingPlayer (advStateMap : Map<int, AdvantageState>) =
+    let private traverse
+        iter
+        deal
+        updatingPlayer
+        (advStateMap : Map<int, AdvantageState>) =
 
         /// Appends an item to the end of an array.
         let append items item =
@@ -172,7 +176,7 @@ module KuhnCfrTrainer =
     /// Adds the given samples to the given reservoir and
     /// then uses the reservoir to train the given model.
     let private updateAdvantageModel
-        reservoir newSamples optim loss model =
+        reservoir newSamples optim model =
 
             // update reservoir
         let resv =
@@ -181,6 +185,7 @@ module KuhnCfrTrainer =
                     Reservoir.add advSample resv)
 
             // train model
+        use loss = torch.nn.MSELoss()
         for _ = 1 to settings.NumModelTrainSteps do
             let samples =
                 Reservoir.sample settings.NumSamples resv
@@ -191,7 +196,7 @@ module KuhnCfrTrainer =
 
     /// Trains a single iteration.
     let private trainIteration
-        iter advLoss (advStateMap : Map<_, _>) =
+        iter (advStateMap : Map<_, _>) =
 
             // train each player's model once
         (advStateMap, seq { 0 .. KuhnPoker.numPlayers - 1})
@@ -215,7 +220,7 @@ module KuhnCfrTrainer =
                     state.Model, state.Optimizer, state.Reservoir
                 let advResv =
                     updateAdvantageModel
-                        advResv advSamples advOptim advLoss advModel
+                        advResv advSamples advOptim advModel
 
                 if updatingPlayer = 0 then
                     printfn "%A, %f"
@@ -230,13 +235,12 @@ module KuhnCfrTrainer =
 
             // create advantage model
         let advStateMap = AdvantageState.createMap ()
-        let advLoss = torch.nn.MSELoss()
 
             // run the iterations
         let advStateMap =
             (advStateMap, seq { 0 .. settings.NumIterations - 1 })
                 ||> Seq.fold (fun advStateMap iter ->
-                    trainIteration iter advLoss advStateMap)
+                    trainIteration iter advStateMap)
 
         advStateMap.Values
             |> Seq.map (fun advState -> advState.Model)
