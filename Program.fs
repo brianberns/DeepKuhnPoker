@@ -78,14 +78,10 @@ module private AdvantageState =
             |> Map
 
     /// Updates advantage state for the given player.
-    let updateMap
-        (player : int) model optimizer reservoir stateMap =
+    let updateMap (player : int) reservoir (stateMap : Map<_, _>) =
         let state =
-            {
-                Model = model
-                Optimizer = optimizer
-                Reservoir = reservoir
-            }
+            { stateMap[player] with
+                Reservoir = reservoir }
         Map.add player state stateMap
 
 module KuhnCfrTrainer =
@@ -185,15 +181,13 @@ module KuhnCfrTrainer =
                     Reservoir.add advSample resv)
 
             // train model
-        let model =
-            (model, seq { 1 .. settings.NumModelTrainSteps })
-                ||> Seq.fold (fun model _ ->
-                    let samples =
-                        Reservoir.sample settings.NumSamples resv
-                    AdvantageModel.train
-                        samples optim loss model)
+        for _ = 1 to settings.NumModelTrainSteps do
+            let samples =
+                Reservoir.sample settings.NumSamples resv
+            AdvantageModel.train
+                samples optim loss model
 
-        resv, model
+        resv
 
     /// Trains a single iteration.
     let private trainIteration
@@ -219,7 +213,7 @@ module KuhnCfrTrainer =
                 let advModel, advOptim, advResv =
                     let state = advStateMap[updatingPlayer]
                     state.Model, state.Optimizer, state.Reservoir
-                let advResv, advModel =
+                let advResv =
                     updateAdvantageModel
                         advResv advSamples advOptim advLoss advModel
 
@@ -229,7 +223,7 @@ module KuhnCfrTrainer =
                         ((getStrategy "Qcb" advModel)[0])
 
                 AdvantageState.updateMap
-                    updatingPlayer advModel advOptim advResv advStateMap)
+                    updatingPlayer advResv advStateMap)
 
     /// Trains for the given number of iterations.
     let train () =
