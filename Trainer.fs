@@ -13,9 +13,6 @@ module Settings =
             /// Random number generator.
             Random = Random(0)
 
-            /// Maximum number of samples stored in a reservoir.
-            ReservoirCapacity = 10_000_000
-
             /// Size of a neural network hidden layer.
             HiddenSize = 16
 
@@ -25,21 +22,19 @@ module Settings =
             /// Number of steps to use when training advantage models.
             NumAdvantageModelTrainSteps = 20
 
-            /// Number of advantage samples to use from the reservoir
-            /// at each step of training.
+            /// Number of advantage samples to keep.
             NumAdvantageSamples = 128
 
             /// Number of deals to traverse during each iteration.
             NumTraversals = 40
 
             /// Number of iterations to perform.
-            NumIterations = 4000
+            NumIterations = 400
 
             /// Number of steps to use when training the strategy model.
             NumStrategyModelTrainSteps = 400
 
-            /// Number of strategy samples to use from the reservoir
-            /// at each step of training.
+            /// Number of strategy samples to keep.
             NumStrategySamples = 1024
         |}
 
@@ -134,11 +129,7 @@ module Trainer =
 
             // train model
         for _ = 1 to settings.NumAdvantageModelTrainSteps do
-            let samples =
-                Reservoir.sample
-                    settings.NumAdvantageSamples
-                    resv
-            AdvantageModel.train samples model
+            AdvantageModel.train resv.Items model
 
         resv
 
@@ -185,11 +176,7 @@ module Trainer =
 
             // train model
         for _ = 1 to settings.NumStrategyModelTrainSteps do
-            let samples =
-                Reservoir.sample
-                    settings.NumStrategySamples
-                    resv
-            StrategyModel.train samples model
+            StrategyModel.train resv.Items model
 
         model
 
@@ -209,7 +196,7 @@ module Trainer =
                 let resv =
                     Reservoir.create
                         settings.Random
-                        settings.ReservoirCapacity
+                        settings.NumAdvantageSamples
                 player, resv)
                 |> Map
 
@@ -218,7 +205,7 @@ module Trainer =
             let stratResv =
                 Reservoir.create
                     settings.Random
-                    settings.ReservoirCapacity
+                    settings.NumStrategySamples
             ((advResvMap, stratResv), seq { 0 .. settings.NumIterations - 1 })
                 ||> Seq.fold (fun (advResvMap, stratResv) iter ->
                     if iter % 100 = 0 then printfn $"Iteration {iter}"

@@ -5,66 +5,75 @@ open System
 /// Reservoir sampler.
 /// https://en.wikipedia.org/wiki/Reservoir_sampling
 type Reservoir<'t> =
-    {
+    private {
+
         /// Random number generator.
         Random : Random
 
-        /// Capacity of this reservoir.
+        /// Maximum number of items this reservoir can hold.
         Capacity : int
 
-        /// Items stored in this reservoir, indexed from
-        /// 0 to Count - 1.
-        Items : Map<int, 't>
+        /// Items stored in this reservoir.
+        ItemMap : Map<int, 't>
 
-        /// Number of items stored in this reservoir.
-        Count : int   // Map.Count is too slow
+        /// Number of items this reservoir currently holds.
+        Count : int
+
+        /// Number of items this reservoir has seen.
+        NumSeen : int
     }
+
+    /// Items held by this reservoir.
+    member this.Items = this.ItemMap.Values
 
 module Reservoir =
 
-    /// Validates the given reservoir.
-    let private isValid reservoir =
-        Seq.toArray reservoir.Items.Keys
-            = [| 0 .. reservoir.Count - 1 |]
-
     /// Creates an empty reservoir.
     let create rng capacity =
-        let reservoir =
-            {
-                Random = rng
-                Capacity = capacity
-                Items = Map.empty
-                Count = 0
-            }
-        assert(isValid reservoir)
-        reservoir
+        assert(capacity > 0)
+        {
+            Random = rng
+            Capacity = capacity
+            ItemMap = Map.empty
+            Count = 0
+            NumSeen = 0
+        }
 
-    /// Adds the given item to the given reservior, replacing
-    /// an existing item at random if necessary.
+    /// Attempts to add the given item to the given reservoir,
+    /// possibly replacing an existing item.
     let add item reservoir =
-        assert(isValid reservoir)
-        let idx =
-            if reservoir.Count < reservoir.Capacity then
-                reservoir.Count
-            else
-                reservoir.Random.Next(reservoir.Count)
-        { reservoir with
-            Items = Map.add idx item reservoir.Items
-            Count = reservoir.Count + 1 }
+        assert(reservoir.Count = reservoir.ItemMap.Count)
+        assert(reservoir.Count <= reservoir.Capacity)
+        assert(reservoir.Count <= reservoir.NumSeen)
 
-    /// Adds the given items to the given reservior, replacing
-    /// existing items at random if necessary.
+        let numSeen = reservoir.NumSeen + 1
+        let idxOpt, count =
+            if reservoir.Count < reservoir.Capacity then
+                assert(reservoir.Count = reservoir.NumSeen)
+                Some reservoir.Count, numSeen
+            else
+                let idx = reservoir.Random.Next(numSeen)
+                if idx < reservoir.Capacity then
+                    Some idx, reservoir.Count
+                else None, reservoir.Count
+        assert(count <= reservoir.Capacity)
+        assert(count <= numSeen)
+
+        let itemMap =
+            idxOpt
+                |> Option.map (fun idx ->
+                    Map.add idx item reservoir.ItemMap)
+                |> Option.defaultValue reservoir.ItemMap
+        {
+            reservoir with
+                ItemMap = itemMap
+                Count = count
+                NumSeen = numSeen
+        }
+
+    /// Attempts to add the given items to the given reservoir,
+    /// possibly replacing existing items.
     let addMany items reservoir =
         (reservoir, items)
             ||> Seq.fold (fun reservoir item ->
                 add item reservoir)
-
-    /// Answers up to the given number of items from the given
-    /// reservoir at random.
-    let sample numSamples reservoir =
-        assert(isValid reservoir)
-        let numSamples = min numSamples reservoir.Count
-        let idxs = [| 0 .. reservoir.Count - 1 |]
-        reservoir.Random.Shuffle(idxs)
-        Seq.init numSamples (fun i ->
-            reservoir.Items[idxs[i]])
