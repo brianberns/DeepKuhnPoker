@@ -23,19 +23,19 @@ module Settings =
             NumAdvantageModelTrainSteps = 20
 
             /// Number of advantage samples to keep.
-            NumAdvantageSamples = 128
+            NumAdvantageSamples = 2048
 
             /// Number of deals to traverse during each iteration.
             NumTraversals = 40
 
             /// Number of iterations to perform.
-            NumIterations = 400
+            NumIterations = 200
 
             /// Number of steps to use when training the strategy model.
             NumStrategyModelTrainSteps = 400
 
             /// Number of strategy samples to keep.
-            NumStrategySamples = 1024
+            NumStrategySamples = 2048
         |}
 
 module Trainer =
