@@ -1,0 +1,15 @@
+absl-py==2.1.0
+grpcio==1.66.2
+importlib_metadata==8.5.0
+Markdown==3.7
+MarkupSafe==3.0.1
+numpy==2.0.2
+packaging==24.1
+pip==24.2
+protobuf==5.28.2
+setuptools==75.1.0
+six==1.16.0
+tensorboard==2.18.0
+tensorboard-data-server==0.7.2
+Werkzeug==3.0.4
+zipp==3.20.2
