@@ -108,6 +108,8 @@ module AdvantageModel =
         loss.backward()
         model.Optimizer.step() |> ignore
 
+        loss.item<float32>()
+
 type StrategySample =
     {
         InfoSetKey : string

@@ -87,19 +87,24 @@ module Trainer =
 
     /// Adds the given samples to the given reservoir and
     /// then uses the reservoir to train the given model.
-    let private trainAdvantageModel resv newSamples model =
+    let private trainAdvantageModel resv newSamples model callback =
 
             // update reservoir
         let resv = Reservoir.addMany newSamples resv
 
             // train model
-        for _ = 1 to settings.NumAdvantageModelTrainSteps do
+        for step = 0 to settings.NumAdvantageModelTrainSteps - 1 do
             AdvantageModel.train resv.Items model
+                |> callback step
 
         resv
 
     /// Trains a single iteration.
-    let private trainIteration iter models (resvMap : Map<_, _>) =
+    let private trainIteration
+        iter
+        models
+        (resvMap : Map<_, _>)
+        callback =
 
             // train each player's model once
         let stratSampleSeqs, resvMap =
@@ -126,6 +131,7 @@ module Trainer =
                                 resvMap[updatingPlayer]
                                 advSamples
                                 models[updatingPlayer]
+                                (callback updatingPlayer)
                         Map.add updatingPlayer resv resvMap
 
                     stratSamples, resvMap)
@@ -173,9 +179,16 @@ module Trainer =
                     settings.NumStrategySamples
             ((advResvMap, stratResv), seq { 0 .. settings.NumIterations - 1 })
                 ||> Seq.fold (fun (advResvMap, stratResv) iter ->
-                    if iter % 100 = 0 then printfn $"Iteration {iter}"
+                    let writer =
+                        torch.utils.tensorboard.SummaryWriter(
+                            $"runs/iter%03d{iter}",
+                            createRunName = true)
                     let advResvMap, stratSamples =
                         trainIteration iter advModels advResvMap
+                            (fun updatingPlayer step loss ->
+                                writer.add_scalar(
+                                    $"advantage/player{updatingPlayer}",
+                                    loss, step))
                     let stratResv =
                         Reservoir.addMany stratSamples stratResv
                     advResvMap, stratResv)
