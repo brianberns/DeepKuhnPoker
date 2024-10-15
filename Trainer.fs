@@ -33,7 +33,7 @@ module Settings =
             NumTraversals = 40
 
             /// Number of iterations to perform.
-            NumIterations = 40
+            NumIterations = 4000
 
             /// Number of steps to use when training the strategy model.
             NumStrategyModelTrainSteps = 400
@@ -221,6 +221,7 @@ module Trainer =
                     settings.ReservoirCapacity
             ((advResvMap, stratResv), seq { 0 .. settings.NumIterations - 1 })
                 ||> Seq.fold (fun (advResvMap, stratResv) iter ->
+                    if iter % 100 = 0 then printfn $"Iteration {iter}"
                     let advResvMap, stratSamples =
                         trainIteration iter advModels advResvMap
                     let stratResv =

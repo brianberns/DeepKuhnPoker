@@ -191,3 +191,11 @@ module StrategyModel =
         model.Optimizer.zero_grad()
         loss.backward()
         model.Optimizer.step() |> ignore
+
+    /// Gets the strategy for the given info set.
+    let getStrategy infoSetKey model =
+        (infoSetKey
+            |> KuhnPoker.Encoding.encodeInput
+            |> torch.tensor)
+            --> model.Network
+            |> model.Softmax.forward

@@ -20,17 +20,17 @@ module Program =
 
         for player = 0 to KuhnPoker.numPlayers - 1 do
             printfn $"\nPlayer {player}"
-            (*
             for infoSetKey in playerInfoSetKeys[player] do
                 let strategy =
-                    Trainer.getStrategy infoSetKey stratModel
+                    (StrategyModel.getStrategy infoSetKey stratModel)
+                        .data<float32>()
+                        .ToArray()
                 printfn "   %-3s: %s = %.3f, %s = %.3f"
                     infoSetKey
                     KuhnPoker.actions[0]
                     strategy[0]
                     KuhnPoker.actions[1]
                     strategy[1]
-            *)
 
     let timer = Diagnostics.Stopwatch.StartNew()
     run ()
