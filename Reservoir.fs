@@ -15,10 +15,10 @@ type Reservoir<'t> =
         /// Items stored in this reservoir, indexed from
         /// 0 to Count - 1.
         Items : Map<int, 't>
-    }
 
-    /// Number of items stored in this reservoir.
-    member this.Count = this.Items.Count
+        /// Number of items stored in this reservoir.
+        Count : int   // Map.Count is too slow
+    }
 
 module Reservoir =
 
@@ -34,6 +34,7 @@ module Reservoir =
                 Random = rng
                 Capacity = capacity
                 Items = Map.empty
+                Count = 0
             }
         assert(isValid reservoir)
         reservoir
@@ -48,7 +49,8 @@ module Reservoir =
             else
                 reservoir.Random.Next(reservoir.Count)
         { reservoir with
-            Items = Map.add idx item reservoir.Items }
+            Items = Map.add idx item reservoir.Items
+            Count = reservoir.Count + 1 }
 
     /// Adds the given items to the given reservior, replacing
     /// existing items at random if necessary.
