@@ -34,4 +34,7 @@ module Settings =
 
             /// Number of strategy samples to keep.
             NumStrategySamples = 2048
+
+            /// Start time of this run.
+            StartTime = DateTime.Now
         |}

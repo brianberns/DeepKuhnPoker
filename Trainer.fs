@@ -177,18 +177,16 @@ module Trainer =
                 Reservoir.create
                     settings.Random
                     settings.NumStrategySamples
-            let stamp = string System.DateTime.Now.Ticks
             ((advResvMap, stratResv), seq { 0 .. settings.NumIterations - 1 })
                 ||> Seq.fold (fun (advResvMap, stratResv) iter ->
                     let writer =
                         torch.utils.tensorboard.SummaryWriter(
-                            $"runs/run{stamp}/iter%03d{iter}",
-                            createRunName = true)
+                            $"runs/run{string settings.StartTime.Ticks}")
                     let advResvMap, stratSamples =
                         trainIteration iter advModels advResvMap
                             (fun updatingPlayer step loss ->
                                 writer.add_scalar(
-                                    $"advantage/player{updatingPlayer}",
+                                    $"iter%03d{iter}/player{updatingPlayer}",
                                     loss, step))
                     let stratResv =
                         Reservoir.addMany stratSamples stratResv
