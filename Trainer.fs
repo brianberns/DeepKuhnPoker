@@ -176,6 +176,23 @@ module Trainer =
 
         resvMap, Seq.concat stratSampleSeqs
 
+    let private trainStrategyModel (resv : Reservoir<StrategySample>) =
+
+        let model =
+            StrategyModel.create
+                settings.HiddenSize
+                settings.LearningRate
+
+            // train model
+        for _ = 1 to settings.NumStrategyModelTrainSteps do
+            let samples =
+                Reservoir.sample
+                    settings.NumStrategySamples
+                    resv
+            StrategyModel.train samples model
+
+        model
+
     /// Trains for the given number of iterations.
     let train () =
 
@@ -196,16 +213,12 @@ module Trainer =
                 player, resv)
                 |> Map
 
-            // create strategy model
-        let stratModel =
-            StrategyModel.create settings.HiddenSize
-        let stratResv =
-            Reservoir.create
-                settings.Random
-                settings.ReservoirCapacity
-
             // run the iterations
-        let stratResv, _ =
+        let _, stratResv =
+            let stratResv =
+                Reservoir.create
+                    settings.Random
+                    settings.ReservoirCapacity
             ((advResvMap, stratResv), seq { 0 .. settings.NumIterations - 1 })
                 ||> Seq.fold (fun (advResvMap, stratResv) iter ->
                     let advResvMap, stratSamples =
@@ -214,4 +227,4 @@ module Trainer =
                         Reservoir.addMany stratSamples stratResv
                     advResvMap, stratResv)
 
-        stratModel
+        trainStrategyModel stratResv
