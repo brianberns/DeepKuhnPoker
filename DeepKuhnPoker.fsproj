@@ -13,6 +13,7 @@
     <Compile Include="InformationSet.fs" />
     <Compile Include="Settings.fs" />
     <Compile Include="Trainer.fs" />
+    <Compile Include="Player.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
