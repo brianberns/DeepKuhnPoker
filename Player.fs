@@ -20,17 +20,21 @@ module Player =
 
         loop ""
 
+    let private getPayoff players numGames =
+        Seq.init numGames (fun _ ->
+            let deal =
+                let iDeal =
+                    settings.Random.Next(
+                        KuhnPoker.allDeals.Length)
+                KuhnPoker.allDeals[iDeal]
+            play deal players)
+            |> Seq.sum
+
     let runTournament players numGames =
-        let payoff =
-            Seq.init numGames (fun _ ->
-                let deal =
-                    let iDeal =
-                        settings.Random.Next(
-                            KuhnPoker.allDeals.Length)
-                    KuhnPoker.allDeals[iDeal]
-                play deal players)
-                |> Seq.sum
-        float payoff / float numGames
+        let halfGames = numGames / 2
+        let payoffA = getPayoff players halfGames
+        let payoffB = -(getPayoff (Array.rev players) halfGames)
+        float (payoffA + payoffB) / (2. * float halfGames)
 
 module Champion =
 

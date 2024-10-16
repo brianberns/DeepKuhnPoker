@@ -1,7 +1,6 @@
 ﻿namespace DeepKuhnPoker
 
 open System
-open TorchSharp
 
 module Program =
 
@@ -59,8 +58,22 @@ module Program =
         printfn "   Kb  bet: %.3f (should be 1)" (strategyMap["Kb"][betIdx])
         printfn "   Kc  bet: %.3f (should be 1)" (strategyMap["Kc"][betIdx])
 
+        strategyMap
+
+    let runTournament strategyMap =
+        let player : Player =
+            let strategyMap =
+                Map.map (fun _ strat ->
+                    MathNet.Numerics.LinearAlgebra.DenseVector.ofArray strat)
+                    strategyMap
+            fun infoSetKey ->
+                Vector.sample settings.Random strategyMap[infoSetKey]
+        Player.runTournament
+            [| player; Champion.player |]
+            1000000
+
     let timer = Diagnostics.Stopwatch.StartNew()
-    run ()
+    let strategyMap = run ()
     printfn ""
     printfn $"Elapsed time: {timer}"
-    
+    printfn $"Average payoff: {runTournament strategyMap}"
