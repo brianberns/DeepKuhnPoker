@@ -104,9 +104,9 @@ module Trainer =
     /// Trains a single iteration.
     let private trainIteration iter models (resvMap : Map<_, _>) =
 
-            // train each player's model once
+            // train each player's model
         let stratSampleSeqs, resvMap =
-            (resvMap, seq { 0 .. KuhnPoker.numPlayers - 1})
+            (resvMap, seq { 0 .. KuhnPoker.numPlayers - 1 })
                 ||> Seq.mapFold (fun resvMap updatingPlayer ->
 
                         // generate training data for this player
