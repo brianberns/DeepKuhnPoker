@@ -158,20 +158,21 @@ module Trainer =
 
         torch.manual_seed(0) |> ignore
 
-            // create advantage model
+            // create advantage models
         let advModels =
             Array.init KuhnPoker.numPlayers (fun _ ->
                 AdvantageModel.create
                     settings.HiddenSize
                     settings.LearningRate)
         let advResvMap =
-            Seq.init KuhnPoker.numPlayers (fun player ->
-                let resv =
-                    Reservoir.create
-                        settings.Random
-                        settings.NumAdvantageSamples
-                player, resv)
-                |> Map
+            Map [
+                for player = 0 to KuhnPoker.numPlayers - 1 do
+                    let resv =
+                        Reservoir.create
+                            settings.Random
+                            settings.NumAdvantageSamples
+                    player, resv
+            ]
 
             // run the iterations
         let _, stratResv =
