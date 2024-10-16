@@ -173,7 +173,6 @@ module Trainer =
     let train () =
 
             // create advantage models
-        torch.manual_seed(0) |> ignore
         let advModels =
             [|
                 for _ = 1 to KuhnPoker.numPlayers do

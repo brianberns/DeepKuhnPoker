@@ -7,9 +7,11 @@ module Settings =
 
     /// Hyperparameters.
     let settings =
+        let seed = 0
+        TorchSharp.torch.manual_seed(seed) |> ignore
         {|
             /// Random number generator.
-            Random = Random(0)
+            Random = Random(seed)
 
             /// Size of a neural network hidden layer.
             HiddenSize = 16
@@ -27,7 +29,7 @@ module Settings =
             NumTraversals = 40
 
             /// Number of iterations to perform.
-            NumIterations = 200
+            NumIterations = 400
 
             /// Number of steps to use when training the strategy model.
             NumStrategyModelTrainSteps = 400
