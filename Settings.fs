@@ -35,6 +35,8 @@ module Settings =
             /// Number of strategy samples to keep.
             NumStrategySamples = 2048
 
-            /// Start time of this run.
-            StartTime = DateTime.Now
+            /// Tensorboard writer.
+            Writer =
+                TorchSharp.torch.utils.tensorboard.SummaryWriter(
+                    $"runs/run{string DateTime.Now.Ticks}")
         |}
