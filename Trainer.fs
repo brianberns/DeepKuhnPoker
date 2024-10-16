@@ -134,14 +134,13 @@ module Trainer =
                         // log losses
                     for step = 0 to losses.Length - 1 do
                         settings.Writer.add_scalar(
-                            $"iter%04d{iter}/player{updatingPlayer}",
+                            $"loss/iter%04d{iter}/player{updatingPlayer}",
                             losses[step], step)
 
                     stratSamples, resvMap)
 
-            // log behavior
-        let infoSetKeys = [ "J"; "K"; "Jc"; "Qb"; "Qcb" ]
-        for infoSetKey in infoSetKeys do
+            // log betting behavior
+        for infoSetKey in [ "J"; "K"; "Jc"; "Qb"; "Qcb" ] do
             let player = (infoSetKey.Length - 1) % 2
             let betProb =
                 (getStrategy infoSetKey models[player])[0]
