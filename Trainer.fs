@@ -147,7 +147,7 @@ module Trainer =
             let player = (infoSetKey.Length - 1) % 2
             let betProb = (getStrategy infoSetKey models[player])[0]
             settings.Writer.add_scalar(
-                $"bet/{infoSetKey}",
+                $"advantage bet probability/{infoSetKey}",
                 betProb,
                 iter)
 
@@ -199,6 +199,10 @@ module Trainer =
                         trainIteration iter advModels advResvMap
                     let stratResv =
                         Reservoir.addMany stratSamples stratResv
+                    settings.Writer.add_scalar(
+                        $"strategy reservoir",
+                        float32 stratResv.Items.Count,
+                        iter)
                     advResvMap, stratResv)
 
             // train the final strategy model
