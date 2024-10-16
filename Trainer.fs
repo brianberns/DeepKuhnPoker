@@ -94,9 +94,10 @@ module Trainer =
 
             // train model
         let losses =
-            Array.init settings.NumAdvantageModelTrainSteps
-                (fun _ ->
-                    AdvantageModel.train resv.Items model)
+            [|
+                for _ = 1 to settings.NumAdvantageModelTrainSteps do
+                    AdvantageModel.train resv.Items model
+            |]
 
         resv, losses
 
@@ -160,10 +161,12 @@ module Trainer =
 
             // create advantage models
         let advModels =
-            Array.init KuhnPoker.numPlayers (fun _ ->
-                AdvantageModel.create
-                    settings.HiddenSize
-                    settings.LearningRate)
+            [|
+                for _ = 1 to KuhnPoker.numPlayers do
+                    AdvantageModel.create
+                        settings.HiddenSize
+                        settings.LearningRate
+            |]
         let advResvMap =
             Map [
                 for player = 0 to KuhnPoker.numPlayers - 1 do
