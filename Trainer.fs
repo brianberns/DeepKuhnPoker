@@ -85,20 +85,15 @@ module Trainer =
 
         loop "" |> snd
 
-    /// Adds the given samples to the given reservoir and
-    /// then uses the reservoir to train the given model.
+    /// Adds the given samples to the given reservoir and then
+    /// uses the reservoir to train the given advantage model.
     let private trainAdvantageModel resv newSamples model =
-
-            // update reservoir
         let resv = Reservoir.addMany newSamples resv
-
-            // train model
         let losses =
             [|
                 for _ = 1 to settings.NumAdvantageModelTrainSteps do
                     AdvantageModel.train resv.Items model
             |]
-
         resv, losses
 
     /// Trains a single iteration.
@@ -151,25 +146,21 @@ module Trainer =
 
         resvMap, Seq.concat stratSampleSeqs
 
+    /// Trains a strategy model using the given samples.
     let private trainStrategyModel (resv : Reservoir<StrategySample>) =
-
         let model =
             StrategyModel.create
                 settings.HiddenSize
                 settings.LearningRate
-
-            // train model
         for _ = 1 to settings.NumStrategyModelTrainSteps do
             StrategyModel.train resv.Items model
-
         model
 
     /// Trains for the given number of iterations.
     let train () =
 
-        torch.manual_seed(0) |> ignore
-
             // create advantage models
+        torch.manual_seed(0) |> ignore
         let advModels =
             [|
                 for _ = 1 to KuhnPoker.numPlayers do
@@ -193,7 +184,8 @@ module Trainer =
                 Reservoir.create
                     settings.Random
                     settings.NumStrategySamples
-            ((advResvMap, stratResv), seq { 0 .. settings.NumIterations - 1 })
+            let iterNums = seq { 0 .. settings.NumIterations - 1 }
+            ((advResvMap, stratResv), iterNums)
                 ||> Seq.fold (fun (advResvMap, stratResv) iter ->
                     let advResvMap, stratSamples =
                         trainIteration iter advModels advResvMap
@@ -201,4 +193,5 @@ module Trainer =
                         Reservoir.addMany stratSamples stratResv
                     advResvMap, stratResv)
 
+            // train the final strategy model
         trainStrategyModel stratResv
