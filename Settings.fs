@@ -27,13 +27,13 @@ module Settings =
             NumTraversals = 40
 
             /// Number of iterations to perform.
-            NumIterations = 400
+            NumIterations = 200
 
             /// Number of steps to use when training the strategy model.
             NumStrategyModelTrainSteps = 400
 
             /// Number of strategy samples to keep.
-            NumStrategySamples = 2048
+            NumStrategySamples = 1_000_000
 
             /// Tensorboard writer.
             Writer =

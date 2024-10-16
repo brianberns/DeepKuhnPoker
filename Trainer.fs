@@ -130,7 +130,11 @@ module Trainer =
                     let resvMap =
                         Map.add updatingPlayer resv resvMap
 
-                        // log losses
+                        // log inputs and losses
+                    settings.Writer.add_scalar(
+                        $"reservoir/player{updatingPlayer}",
+                        float32 resv.Items.Count,
+                        iter)
                     for step = 0 to losses.Length - 1 do
                         settings.Writer.add_scalar(
                             $"loss/iter%04d{iter}/player{updatingPlayer}",
