@@ -37,6 +37,7 @@ module Settings =
 
             /// Tensorboard writer.
             Writer =
+                let timespan = DateTime.Now - DateTime.Today
                 TorchSharp.torch.utils.tensorboard.SummaryWriter(
-                    $"runs/run{string DateTime.Now.Ticks}")
+                    $"runs/run%5d{int timespan.TotalSeconds}")
         |}

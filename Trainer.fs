@@ -87,24 +87,21 @@ module Trainer =
 
     /// Adds the given samples to the given reservoir and
     /// then uses the reservoir to train the given model.
-    let private trainAdvantageModel resv newSamples model callback =
+    let private trainAdvantageModel resv newSamples model =
 
             // update reservoir
         let resv = Reservoir.addMany newSamples resv
 
             // train model
-        for step = 0 to settings.NumAdvantageModelTrainSteps - 1 do
-            AdvantageModel.train resv.Items model
-                |> callback step
+        let losses =
+            Array.init settings.NumAdvantageModelTrainSteps
+                (fun _ ->
+                    AdvantageModel.train resv.Items model)
 
-        resv
+        resv, losses
 
     /// Trains a single iteration.
-    let private trainIteration
-        iter
-        models
-        (resvMap : Map<_, _>)
-        callback =
+    let private trainIteration iter models (resvMap : Map<_, _>) =
 
             // train each player's model once
         let stratSampleSeqs, resvMap =
@@ -125,14 +122,19 @@ module Trainer =
                         |]
 
                         // train model
+                    let resv, losses =
+                        trainAdvantageModel
+                            resvMap[updatingPlayer]
+                            advSamples
+                            models[updatingPlayer]
                     let resvMap =
-                        let resv =
-                            trainAdvantageModel
-                                resvMap[updatingPlayer]
-                                advSamples
-                                models[updatingPlayer]
-                                (callback updatingPlayer)
                         Map.add updatingPlayer resv resvMap
+
+                        // log losses
+                    for step = 0 to losses.Length - 1 do
+                        settings.Writer.add_scalar(
+                            $"iter%04d{iter}/player{updatingPlayer}",
+                            losses[step], step)
 
                     stratSamples, resvMap)
 
@@ -181,10 +183,6 @@ module Trainer =
                 ||> Seq.fold (fun (advResvMap, stratResv) iter ->
                     let advResvMap, stratSamples =
                         trainIteration iter advModels advResvMap
-                            (fun updatingPlayer step loss ->
-                                settings.Writer.add_scalar(
-                                    $"iter%04d{iter}/player{updatingPlayer}",
-                                    loss, step))
                     let stratResv =
                         Reservoir.addMany stratSamples stratResv
                     advResvMap, stratResv)

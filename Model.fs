@@ -71,7 +71,8 @@ module AdvantageModel =
             |> torch.tensor)
             --> model.Network
 
-    /// Trains the given model using the given samples.
+    /// Trains the given model a single step using the given
+    /// samples.
     let train samples model =
 
             // forward pass
