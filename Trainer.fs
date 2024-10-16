@@ -139,6 +139,17 @@ module Trainer =
 
                     stratSamples, resvMap)
 
+            // log behavior
+        let infoSetKeys = [ "J"; "K"; "Jc"; "Qb"; "Qcb" ]
+        for infoSetKey in infoSetKeys do
+            let player = (infoSetKey.Length - 1) % 2
+            let betProb =
+                (getStrategy infoSetKey models[player])[0]
+            settings.Writer.add_scalar(
+                $"bet/{infoSetKey}",
+                betProb,
+                iter)
+
         resvMap, Seq.concat stratSampleSeqs
 
     let private trainStrategyModel (resv : Reservoir<StrategySample>) =
