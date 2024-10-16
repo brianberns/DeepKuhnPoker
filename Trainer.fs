@@ -85,6 +85,19 @@ module Trainer =
 
         loop "" |> snd
 
+    /// Generates training data for the given player.
+    let private generateSamples iter updatingPlayer models =
+        Choice.unzip [|
+            for _ = 1 to settings.NumTraversals do
+                let deal =
+                    let iDeal =
+                        settings.Random.Next(
+                            KuhnPoker.allDeals.Length)
+                    KuhnPoker.allDeals[iDeal]
+                yield! traverse
+                    iter deal updatingPlayer models
+        |]
+
     /// Adds the given samples to the given reservoir and then
     /// uses the reservoir to train the given advantage model.
     let private trainAdvantageModel resv newSamples model =
@@ -106,18 +119,9 @@ module Trainer =
 
                         // generate training data for this player
                     let advSamples, stratSamples =
-                        Choice.unzip [|
-                            for _ = 1 to settings.NumTraversals do
-                                let deal =
-                                    let iDeal =
-                                        settings.Random.Next(
-                                            KuhnPoker.allDeals.Length)
-                                    KuhnPoker.allDeals[iDeal]
-                                yield! traverse
-                                    iter deal updatingPlayer models
-                        |]
+                        generateSamples iter updatingPlayer models
 
-                        // train model
+                        // train this player's model
                     let resv, losses =
                         trainAdvantageModel
                             resvMap[updatingPlayer]
@@ -137,8 +141,7 @@ module Trainer =
             // log betting behavior
         for infoSetKey in [ "J"; "K"; "Jc"; "Qb"; "Qcb" ] do
             let player = (infoSetKey.Length - 1) % 2
-            let betProb =
-                (getStrategy infoSetKey models[player])[0]
+            let betProb = (getStrategy infoSetKey models[player])[0]
             settings.Writer.add_scalar(
                 $"bet/{infoSetKey}",
                 betProb,
