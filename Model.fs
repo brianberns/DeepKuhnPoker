@@ -195,6 +195,8 @@ module StrategyModel =
         loss.backward()
         model.Optimizer.step() |> ignore
 
+        loss.item<float32>()
+
     /// Gets the strategy for the given info set.
     let getStrategy infoSetKey model =
         (infoSetKey

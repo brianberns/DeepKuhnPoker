@@ -132,12 +132,12 @@ module Trainer =
 
                         // log inputs and losses
                     settings.Writer.add_scalar(
-                        $"reservoir/player{updatingPlayer}",
+                        $"advantage reservoir/player{updatingPlayer}",
                         float32 resv.Items.Count,
                         iter)
                     for step = 0 to losses.Length - 1 do
                         settings.Writer.add_scalar(
-                            $"loss/iter%04d{iter}/player{updatingPlayer}",
+                            $"advantage loss/iter%04d{iter}/player{updatingPlayer}",
                             losses[step], step)
 
                     stratSamples, resvMap)
@@ -159,8 +159,9 @@ module Trainer =
             StrategyModel.create
                 settings.HiddenSize
                 settings.LearningRate
-        for _ = 1 to settings.NumStrategyModelTrainSteps do
-            StrategyModel.train resv.Items model
+        for step = 0 to settings.NumStrategyModelTrainSteps - 1 do
+            let loss = StrategyModel.train resv.Items model
+            settings.Writer.add_scalar("strategy loss", loss, step)
         model
 
     /// Trains for the given number of iterations.
