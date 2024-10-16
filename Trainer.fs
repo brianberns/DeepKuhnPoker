@@ -103,10 +103,10 @@ module Trainer =
     let private trainAdvantageModel resv newSamples model =
         let resv = Reservoir.addMany newSamples resv
         let losses =
-            [|
-                for _ = 1 to settings.NumAdvantageModelTrainSteps do
-                    AdvantageModel.train resv.Items model
-            |]
+            AdvantageModel.train
+                settings.NumAdvantageModelTrainSteps
+                resv.Items
+                model
         resv, losses
 
     /// Trains a single iteration.
@@ -159,9 +159,14 @@ module Trainer =
             StrategyModel.create
                 settings.HiddenSize
                 settings.LearningRate
-        for step = 0 to settings.NumStrategyModelTrainSteps - 1 do
-            let loss = StrategyModel.train resv.Items model
-            settings.Writer.add_scalar("strategy loss", loss, step)
+        let losses =
+            StrategyModel.train
+                settings.NumStrategyModelTrainSteps
+                resv.Items
+                model
+        for step = 0 to losses.Length - 1 do
+            settings.Writer.add_scalar(
+                "strategy loss", losses[step], step)
         model
 
     /// Trains for the given number of iterations.

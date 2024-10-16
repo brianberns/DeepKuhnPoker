@@ -71,45 +71,50 @@ module AdvantageModel =
             |> torch.tensor)
             --> model.Network
 
-    /// Trains the given model a single step using the given
-    /// samples.
-    let train samples model =
+    /// Trains the given model using the given samples.
+    let train numSteps samples model =
 
-            // forward pass
-        let loss =
-            let inputs =
-                samples
-                    |> Seq.map (fun sample ->
-                        sample.InfoSetKey
-                            |> KuhnPoker.Encoding.encodeInput)
-                    |> array2D
-                    |> torch.tensor
-            let targets =
-                samples
-                    |> Seq.map (fun sample ->
-                        sample.Regrets)
-                    |> array2D
-                    |> torch.tensor
-            let iters =
-                samples
-                    |> Seq.map (fun sample ->
-                        (sample.Iteration + 1)   // make 1-based
-                            |> float32
-                            |> sqrt
-                            |> Seq.singleton )
-                    |> array2D
-                    |> torch.tensor
-            let outputs = inputs --> model.Network
-            model.Loss.forward(
-                iters * outputs,   // favor newer iterations
-                iters * targets)
+            // prepare training data
+        let inputs =
+            samples
+                |> Seq.map (fun sample ->
+                    sample.InfoSetKey
+                        |> KuhnPoker.Encoding.encodeInput)
+                |> array2D
+                |> torch.tensor
+        let targets =
+            samples
+                |> Seq.map (fun sample ->
+                    sample.Regrets)
+                |> array2D
+                |> torch.tensor
+        let iters =
+            samples
+                |> Seq.map (fun sample ->
+                    (sample.Iteration + 1)   // make 1-based
+                        |> float32
+                        |> sqrt
+                        |> Seq.singleton )
+                |> array2D
+                |> torch.tensor
 
-            // backward pass and optimize
-        model.Optimizer.zero_grad()
-        loss.backward()
-        model.Optimizer.step() |> ignore
+        [|
+            for _ = 1 to numSteps do
 
-        loss.item<float32>()
+                    // forward pass
+                let loss =
+                    let outputs = inputs --> model.Network
+                    model.Loss.forward(
+                        iters * outputs,   // favor newer iterations
+                        iters * targets)
+
+                    // backward pass and optimize
+                model.Optimizer.zero_grad()
+                loss.backward()
+                model.Optimizer.step() |> ignore
+
+                loss.item<float32>()
+        |]
 
 type StrategySample =
     {
@@ -157,45 +162,51 @@ module StrategyModel =
         }
 
     /// Trains the given model using the given samples.
-    let train samples model =
+    let train numSteps samples model =
 
-            // forward pass
-        let loss =
-            let inputs =
-                samples
-                    |> Seq.map (fun sample ->
-                        sample.InfoSetKey
-                            |> KuhnPoker.Encoding.encodeInput)
-                    |> array2D
-                    |> torch.tensor
-            let targets =
-                samples
-                    |> Seq.map (fun sample ->
-                        sample.Strategy)
-                    |> array2D
-                    |> torch.tensor
-            let iters =
-                samples
-                    |> Seq.map (fun sample ->
-                        (sample.Iteration + 1)   // make 1-based
-                            |> float32
-                            |> sqrt
-                            |> Seq.singleton )
-                    |> array2D
-                    |> torch.tensor
-            let outputs =
-                (inputs --> model.Network)
-                    |> model.Softmax.forward
-            model.Loss.forward(
-                iters * outputs,   // favor newer iterations
-                iters * targets)
+            // prepare training data
+        let inputs =
+            samples
+                |> Seq.map (fun sample ->
+                    sample.InfoSetKey
+                        |> KuhnPoker.Encoding.encodeInput)
+                |> array2D
+                |> torch.tensor
+        let targets =
+            samples
+                |> Seq.map (fun sample ->
+                    sample.Strategy)
+                |> array2D
+                |> torch.tensor
+        let iters =
+            samples
+                |> Seq.map (fun sample ->
+                    (sample.Iteration + 1)   // make 1-based
+                        |> float32
+                        |> sqrt
+                        |> Seq.singleton )
+                |> array2D
+                |> torch.tensor
 
-            // backward pass and optimize
-        model.Optimizer.zero_grad()
-        loss.backward()
-        model.Optimizer.step() |> ignore
+        [|
+            for _ = 1 to numSteps do
 
-        loss.item<float32>()
+                    // forward pass
+                let loss =
+                    let outputs =
+                        (inputs --> model.Network)
+                            |> model.Softmax.forward
+                    model.Loss.forward(
+                        iters * outputs,   // favor newer iterations
+                        iters * targets)
+
+                    // backward pass and optimize
+                model.Optimizer.zero_grad()
+                loss.backward()
+                model.Optimizer.step() |> ignore
+
+                loss.item<float32>()
+        |]
 
     /// Gets the strategy for the given info set.
     let getStrategy infoSetKey model =
