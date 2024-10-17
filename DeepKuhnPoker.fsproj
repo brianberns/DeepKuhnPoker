@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="Readme.md" />
     <None Include="Hyperparameters.xlsx" />
     <Compile Include="Prelude.fs" />
     <Compile Include="Reservoir.fs" />
