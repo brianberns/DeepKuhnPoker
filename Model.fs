@@ -1,13 +1,20 @@
 ﻿namespace DeepKuhnPoker
 
 open TorchSharp
+open TorchSharp.Modules
 open type torch
 open type torch.nn
+open type torch.optim
 open FSharp.Core.Operators   // reclaim "float32" and other F# operators
 
 open MathNet.Numerics.LinearAlgebra
 
+/// Neural network that maps an input tensor to an output
+/// tensor.
 type Network = Module<Tensor, Tensor>
+
+/// Loss function.
+type Loss = Loss<Tensor, Tensor, Tensor>
 
 module Network =
 
@@ -16,6 +23,7 @@ module Network =
 
     /// Length of neural network output.
     let outputSize = KuhnPoker.actions.Length
+
 
 /// An observed advantage event.
 type AdvantageSample =
@@ -32,6 +40,7 @@ type AdvantageSample =
 
 module AdvantageSample =
 
+    /// Creates an advantage sample.
     let create infoSetKey regrets iteration =
         {
             InfoSetKey = infoSetKey
@@ -39,11 +48,17 @@ module AdvantageSample =
             Iteration = iteration
         }
 
+/// Model used for learning advantages.
 type AdvantageModel =
     {
+        /// Neural network.
         Network : Network
-        Optimizer : optim.Optimizer
-        Loss : Loss<Tensor, Tensor, Tensor>
+
+        /// Training optimizer.
+        Optimizer : Optimizer
+
+        /// Training loss function.
+        Loss : Loss
     }
 
 module AdvantageModel =
@@ -60,7 +75,7 @@ module AdvantageModel =
         {
             Network = network
             Optimizer =
-                optim.Adam(
+                Adam(
                     network.parameters(),
                     lr = learningRate)
             Loss = MSELoss()
@@ -107,7 +122,7 @@ module AdvantageModel =
                 let loss =
                     let outputs = inputs --> model.Network
                     model.Loss.forward(
-                        iters * outputs,   // favor newer iterations
+                        iters * outputs,   // favor later iterations
                         iters * targets)
 
                     // backward pass and optimize
@@ -118,28 +133,48 @@ module AdvantageModel =
                 loss.item<float32>()
         |]
 
+/// An observed strategy event.
 type StrategySample =
     {
+        /// Key of info set.
         InfoSetKey : string
+
+        /// Observed strategy.
         Strategy : Vector<float32>
+
+        /// O-based iteration number.
         Iteration : int
     }
 
 module StrategySample =
 
-    let create infoSetKey regrets iteration =
+    /// Creates a strategy sample.
+    let create infoSetKey strategy iteration =
         {
+            /// Key of info set.
             InfoSetKey = infoSetKey
-            Strategy = regrets
+
+            /// Observed strategy.
+            Strategy = strategy
+
+            /// 0-based iteration number.
             Iteration = iteration
         }
 
+/// Model used for learning strategy.
 type StrategyModel =
     {
+        /// Neural network.
         Network : Network
-        Optimizer : optim.Optimizer
-        Loss : Loss<Tensor, Tensor, Tensor>
-        Softmax : Modules.Softmax
+
+        /// Training optimizer.
+        Optimizer : Optimizer
+
+        /// Training loss function.
+        Loss : Loss
+
+        /// Softmax layer.
+        Softmax : Softmax
     }
 
 module StrategyModel =
@@ -156,7 +191,7 @@ module StrategyModel =
         {
             Network = network
             Optimizer =
-                optim.Adam(
+                Adam(
                     network.parameters(),
                     lr = learningRate)
             Loss = MSELoss()
@@ -199,7 +234,7 @@ module StrategyModel =
                         (inputs --> model.Network)
                             |> model.Softmax.forward
                     model.Loss.forward(
-                        iters * outputs,   // favor newer iterations
+                        iters * outputs,   // favor later iterations
                         iters * targets)
 
                     // backward pass and optimize
