@@ -24,7 +24,6 @@ module Network =
     /// Length of neural network output.
     let outputSize = KuhnPoker.actions.Length
 
-
 /// An observed advantage event.
 type AdvantageSample =
     {
