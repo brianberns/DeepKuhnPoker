@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="Hyperparameters.xlsx" />
     <Compile Include="Prelude.fs" />
     <Compile Include="Reservoir.fs" />
     <Compile Include="KuhnPoker.fs" />
@@ -16,6 +17,8 @@
     <Compile Include="Player.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
+
+  <ItemGroup />
 
   <ItemGroup>
     <PackageReference Include="MathNet.Numerics.FSharp" Version="5.0.0" />
