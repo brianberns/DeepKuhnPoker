@@ -1,11 +1,13 @@
 ﻿namespace DeepKuhnPoker
 
 open TorchSharp
+open type torch
 open type torch.nn
+open FSharp.Core.Operators   // reclaim "float32" and other F# operators
 
 open MathNet.Numerics.LinearAlgebra
 
-type Network = Module<torch.Tensor, torch.Tensor>
+type Network = Module<Tensor, Tensor>
 
 module Network =
 
@@ -40,8 +42,8 @@ module AdvantageSample =
 type AdvantageModel =
     {
         Network : Network
-        Optimizer : torch.optim.Optimizer
-        Loss : Loss<torch.Tensor, torch.Tensor, torch.Tensor>
+        Optimizer : optim.Optimizer
+        Loss : Loss<Tensor, Tensor, Tensor>
     }
 
 module AdvantageModel =
@@ -58,17 +60,17 @@ module AdvantageModel =
         {
             Network = network
             Optimizer =
-                torch.optim.Adam(
+                optim.Adam(
                     network.parameters(),
                     lr = learningRate)
-            Loss = torch.nn.MSELoss()
+            Loss = MSELoss()
         }
 
     /// Gets the advantage for the given info set.
     let getAdvantage infoSetKey model =
         (infoSetKey
             |> KuhnPoker.Encoding.encodeInput
-            |> torch.tensor)
+            |> tensor)
             --> model.Network
 
     /// Trains the given model using the given samples.
@@ -81,13 +83,13 @@ module AdvantageModel =
                     sample.InfoSetKey
                         |> KuhnPoker.Encoding.encodeInput)
                 |> array2D
-                |> torch.tensor
+                |> tensor
         let targets =
             samples
                 |> Seq.map (fun sample ->
                     sample.Regrets)
                 |> array2D
-                |> torch.tensor
+                |> tensor
         let iters =
             samples
                 |> Seq.map (fun sample ->
@@ -96,7 +98,7 @@ module AdvantageModel =
                         |> sqrt
                         |> Seq.singleton )
                 |> array2D
-                |> torch.tensor
+                |> tensor
 
         [|
             for _ = 1 to numSteps do
@@ -135,8 +137,8 @@ module StrategySample =
 type StrategyModel =
     {
         Network : Network
-        Optimizer : torch.optim.Optimizer
-        Loss : Loss<torch.Tensor, torch.Tensor, torch.Tensor>
+        Optimizer : optim.Optimizer
+        Loss : Loss<Tensor, Tensor, Tensor>
         Softmax : Modules.Softmax
     }
 
@@ -154,11 +156,11 @@ module StrategyModel =
         {
             Network = network
             Optimizer =
-                torch.optim.Adam(
+                optim.Adam(
                     network.parameters(),
                     lr = learningRate)
-            Loss = torch.nn.MSELoss()
-            Softmax = torch.nn.Softmax(dim = -1)
+            Loss = MSELoss()
+            Softmax = Softmax(dim = -1)
         }
 
     /// Trains the given model using the given samples.
@@ -171,13 +173,13 @@ module StrategyModel =
                     sample.InfoSetKey
                         |> KuhnPoker.Encoding.encodeInput)
                 |> array2D
-                |> torch.tensor
+                |> tensor
         let targets =
             samples
                 |> Seq.map (fun sample ->
                     sample.Strategy)
                 |> array2D
-                |> torch.tensor
+                |> tensor
         let iters =
             samples
                 |> Seq.map (fun sample ->
@@ -186,7 +188,7 @@ module StrategyModel =
                         |> sqrt
                         |> Seq.singleton )
                 |> array2D
-                |> torch.tensor
+                |> tensor
 
         [|
             for _ = 1 to numSteps do
@@ -212,6 +214,6 @@ module StrategyModel =
     let getStrategy infoSetKey model =
         (infoSetKey
             |> KuhnPoker.Encoding.encodeInput
-            |> torch.tensor)
+            |> tensor)
             --> model.Network
             |> model.Softmax.forward
