@@ -85,8 +85,18 @@ module Trainer =
 
         loop "" |> snd
 
+    /// Advantage state managed for each player.
+    type private AdvantageState =
+        {
+            /// Player's model.
+            Model : AdvantageModel
+
+            /// Player's reservoir.
+            Reservoir : Reservoir<AdvantageSample>
+        }
+
     /// Generates training data for the given player.
-    let private generateSamples iter updatingPlayer models =
+    let private generateSamples iter updatingPlayer stateMap =
         Choice.unzip [|
             for _ = 1 to settings.NumTraversals do
                 let deal =
@@ -94,41 +104,46 @@ module Trainer =
                         settings.Random.Next(
                             KuhnPoker.allDeals.Length)
                     KuhnPoker.allDeals[iDeal]
+                let models =
+                    stateMap
+                        |> Map.values
+                        |> Seq.map (fun state -> state.Model)
+                        |> Seq.toArray
                 yield! traverse
                     iter deal updatingPlayer models
         |]
 
     /// Adds the given samples to the given reservoir and then
     /// uses the reservoir to train the given advantage model.
-    let private trainAdvantageModel resv newSamples model =
-        let resv = Reservoir.addMany newSamples resv
+    let private trainAdvantageModel state newSamples =
+        let resv =
+            Reservoir.addMany newSamples state.Reservoir
         let losses =
             AdvantageModel.train
                 settings.NumAdvantageModelTrainSteps
                 resv.Items
-                model
+                state.Model
         resv, losses
 
     /// Trains a single iteration.
-    let private trainIteration iter models (resvMap : Map<_, _>) =
+    let private trainIteration iter stateMap =
 
             // train each player's model
         let stratSampleSeqs, resvMap =
-            (resvMap, seq { 0 .. KuhnPoker.numPlayers - 1 })
-                ||> Seq.mapFold (fun resvMap updatingPlayer ->
+            (stateMap, seq { 0 .. KuhnPoker.numPlayers - 1 })
+                ||> Seq.mapFold (fun stateMap updatingPlayer ->
 
                         // generate training data for this player
                     let advSamples, stratSamples =
-                        generateSamples iter updatingPlayer models
+                        generateSamples iter updatingPlayer stateMap
 
                         // train this player's model
+                    let state = stateMap[updatingPlayer]
                     let resv, losses =
-                        trainAdvantageModel
-                            resvMap[updatingPlayer]
-                            advSamples
-                            models[updatingPlayer]
-                    let resvMap =
-                        Map.add updatingPlayer resv resvMap
+                        trainAdvantageModel state advSamples
+                    let stateMap =
+                        let state = { state with Reservoir = resv }
+                        Map.add updatingPlayer state stateMap
 
                         // log inputs and losses
                     settings.Writer.add_scalar(
@@ -140,12 +155,15 @@ module Trainer =
                             $"advantage loss/iter%04d{iter}/player{updatingPlayer}",
                             losses[step], step)
 
-                    stratSamples, resvMap)
+                    stratSamples, stateMap)
 
             // log betting behavior
         for infoSetKey in [ "J"; "K"; "Jc"; "Qb"; "Qcb" ] do
-            let player = (infoSetKey.Length - 1) % 2
-            let betProb = (getStrategy infoSetKey models[player])[0]
+            let betProb =
+                let model =
+                    let player = (infoSetKey.Length - 1) % 2
+                    stateMap[player].Model
+                (getStrategy infoSetKey model)[0]
             settings.Writer.add_scalar(
                 $"advantage bet probability/{infoSetKey}",
                 betProb,
@@ -173,22 +191,22 @@ module Trainer =
     let train () =
 
             // create advantage models
-        let advModels =
-            [|
-                for _ = 1 to KuhnPoker.numPlayers do
-                    AdvantageModel.create
-                        settings.HiddenSize
-                        settings.LearningRate
-            |]
-        let advResvMap =
-            Map [
+        let advStateMap =
+            Map [|
                 for player = 0 to KuhnPoker.numPlayers - 1 do
-                    let resv =
-                        Reservoir.create
-                            settings.Random
-                            settings.NumAdvantageSamples
-                    player, resv
-            ]
+                    let state =
+                        {
+                            Model =
+                                AdvantageModel.create
+                                    settings.HiddenSize
+                                    settings.LearningRate
+                            Reservoir =
+                                Reservoir.create
+                                    settings.Random
+                                    settings.NumAdvantageSamples
+                        }
+                    player, state
+            |]
 
             // run the iterations
         let _, stratResv =
@@ -197,10 +215,10 @@ module Trainer =
                     settings.Random
                     settings.NumStrategySamples
             let iterNums = seq { 0 .. settings.NumIterations - 1 }
-            ((advResvMap, stratResv), iterNums)
-                ||> Seq.fold (fun (advResvMap, stratResv) iter ->
+            ((advStateMap, stratResv), iterNums)
+                ||> Seq.fold (fun (advStateMap, stratResv) iter ->
                     let advResvMap, stratSamples =
-                        trainIteration iter advModels advResvMap
+                        trainIteration iter advStateMap
                     let stratResv =
                         Reservoir.addMany stratSamples stratResv
                     settings.Writer.add_scalar(
