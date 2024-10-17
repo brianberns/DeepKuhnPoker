@@ -80,8 +80,8 @@ module KuhnPoker =
                 let oneHot =
                     match c with
                         | 'J' -> [| 1.0f; 0.0f; 0.0f |]
-                        | 'K' -> [| 0.0f; 1.0f; 0.0f |]
-                        | 'Q' -> [| 0.0f; 0.0f; 1.0f |]
+                        | 'Q' -> [| 0.0f; 1.0f; 0.0f |]
+                        | 'K' -> [| 0.0f; 0.0f; 1.0f |]
                         | 'b' -> [| 1.0f; 0.0f; 0.0f |]
                         | 'c' -> [| 0.0f; 1.0f; 0.0f |]
                         | _ -> failwith "Unexpected"
