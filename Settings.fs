@@ -17,10 +17,10 @@ module Settings =
             HiddenSize = 32
 
             /// Optimizer learning rate.
-            LearningRate = 1e-3
+            LearningRate = 1e-2
 
             /// Number of steps to use when training advantage models.
-            NumAdvantageTrainSteps = 200
+            NumAdvantageTrainSteps = 40
 
             /// Number of advantage samples to keep.
             NumAdvantageSamples = 2048
