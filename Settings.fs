@@ -14,7 +14,7 @@ module Settings =
             Random = Random(seed)
 
             /// Size of a neural network hidden layer.
-            HiddenSize = 16
+            HiddenSize = 32
 
             /// Optimizer learning rate.
             LearningRate = 1e-3
