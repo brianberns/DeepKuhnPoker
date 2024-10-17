@@ -163,7 +163,9 @@ module Trainer =
                         generateSamples iter updatingPlayer stateMap
 
                         // train this player's model
-                    let state = stateMap[updatingPlayer]
+                    let state =
+                        stateMap[updatingPlayer]
+                            |> AdvantageState.resetModel
                     let resv, losses =
                         trainAdvantageModel state advSamples
                     let stateMap =
