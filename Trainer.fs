@@ -95,6 +95,31 @@ module Trainer =
             Reservoir : Reservoir<AdvantageSample>
         }
 
+    module private AdvantageState =
+
+        /// Creates an advantage model.
+        let private createModel () =
+            AdvantageModel.create
+                settings.HiddenSize
+                settings.LearningRate
+
+        /// Creates an advantage state.
+        let create () =
+            {
+                Model = createModel ()
+                Reservoir =
+                    Reservoir.create
+                        settings.Random
+                        settings.NumAdvantageSamples
+            }
+
+        /// Resets the model of the given state.
+        let resetModel state =
+            {
+                state with
+                    Model = createModel ()
+            }
+
     /// Generates training data for the given player.
     let private generateSamples iter updatingPlayer stateMap =
         Choice.unzip [|
@@ -190,22 +215,11 @@ module Trainer =
     /// Trains for the given number of iterations.
     let train () =
 
-            // create advantage models
+            // create advantage state
         let advStateMap =
             Map [|
                 for player = 0 to KuhnPoker.numPlayers - 1 do
-                    let state =
-                        {
-                            Model =
-                                AdvantageModel.create
-                                    settings.HiddenSize
-                                    settings.LearningRate
-                            Reservoir =
-                                Reservoir.create
-                                    settings.Random
-                                    settings.NumAdvantageSamples
-                        }
-                    player, state
+                    player, AdvantageState.create ()
             |]
 
             // run the iterations
