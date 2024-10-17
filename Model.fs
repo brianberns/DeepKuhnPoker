@@ -69,8 +69,6 @@ module AdvantageModel =
             Sequential(
                 Linear(Network.inputSize, hiddenSize),
                 ReLU(),
-                Linear(hiddenSize, hiddenSize),
-                ReLU(),
                 Linear(hiddenSize, Network.outputSize))
         {
             Network = network
@@ -184,8 +182,6 @@ module StrategyModel =
         let network =
             Sequential(
                 Linear(Network.inputSize, hiddenSize),
-                ReLU(),
-                Linear(hiddenSize, hiddenSize),
                 ReLU(),
                 Linear(hiddenSize, Network.outputSize))
         {
