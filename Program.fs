@@ -28,17 +28,6 @@ module Program =
                     infoSetKey, strategy)
                 |> Map
 
-        for player = 0 to KuhnPoker.numPlayers - 1 do
-            printfn $"\nPlayer {player}"
-            for infoSetKey in playerInfoSetKeys[player] do
-                let strategy = strategyMap[infoSetKey]
-                printfn "   %-3s: %s = %.3f, %s = %.3f"
-                    infoSetKey
-                    KuhnPoker.actions[0]
-                    strategy[0]
-                    KuhnPoker.actions[1]
-                    strategy[1]
-
         let betIdx = Array.IndexOf(KuhnPoker.actions, "b")
         let alpha = strategyMap["J"][betIdx]
         printfn ""
@@ -64,10 +53,13 @@ module Program =
         let player : Player =
             let strategyMap =
                 Map.map (fun _ strat ->
-                    MathNet.Numerics.LinearAlgebra.DenseVector.ofArray strat)
+                    MathNet.Numerics.LinearAlgebra
+                        .DenseVector.ofArray strat)
                     strategyMap
             fun infoSetKey ->
-                Vector.sample settings.Random strategyMap[infoSetKey]
+                Vector.sample
+                    settings.Random
+                    strategyMap[infoSetKey]
         Player.runTournament
             [| player; Champion.player |]
             1000000
