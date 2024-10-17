@@ -20,7 +20,7 @@ module Settings =
             LearningRate = 1e-3
 
             /// Number of steps to use when training advantage models.
-            NumAdvantageModelTrainSteps = 200
+            NumAdvantageTrainSteps = 200
 
             /// Number of advantage samples to keep.
             NumAdvantageSamples = 2048
@@ -32,7 +32,7 @@ module Settings =
             NumIterations = 400
 
             /// Number of steps to use when training the strategy model.
-            NumStrategyModelTrainSteps = 400
+            NumStrategyTrainSteps = 400
 
             /// Number of strategy samples to keep.
             NumStrategySamples = 1_000_000

@@ -145,7 +145,7 @@ module Trainer =
             Reservoir.addMany newSamples state.Reservoir
         let losses =
             AdvantageModel.train
-                settings.NumAdvantageModelTrainSteps
+                settings.NumAdvantageTrainSteps
                 resv.Items
                 state.Model
         resv, losses
@@ -206,7 +206,7 @@ module Trainer =
                 settings.LearningRate
         let losses =
             StrategyModel.train
-                settings.NumStrategyModelTrainSteps
+                settings.NumStrategyTrainSteps
                 resv.Items
                 model
         for step = 0 to losses.Length - 1 do
