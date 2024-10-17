@@ -9,7 +9,8 @@ module Trainer =
     /// given advantage model.
     let getStrategy infoSetKey model =
         use _ = torch.no_grad()   // use model.eval() instead?
-        (AdvantageModel.getAdvantage infoSetKey model)
+        (AdvantageModel.getAdvantage
+            settings.Device infoSetKey model)
             .data<float32>()
             |> DenseVector.ofSeq
             |> InformationSet.getStrategy
@@ -100,6 +101,7 @@ module Trainer =
         /// Creates an advantage model.
         let private createModel () =
             AdvantageModel.create
+                settings.Device
                 settings.HiddenSize
                 settings.LearningRate
 
@@ -145,6 +147,7 @@ module Trainer =
             Reservoir.addMany newSamples state.Reservoir
         let losses =
             AdvantageModel.train
+                settings.Device
                 settings.NumAdvantageTrainSteps
                 resv.Items
                 state.Model
@@ -202,10 +205,12 @@ module Trainer =
     let private trainStrategyModel (resv : Reservoir<_>) =
         let model =
             StrategyModel.create
+                settings.Device
                 settings.HiddenSize
                 settings.LearningRate
         let losses =
             StrategyModel.train
+                settings.Device
                 settings.NumStrategyTrainSteps
                 resv.Items
                 model

@@ -22,7 +22,8 @@ module Program =
                 |> Seq.concat 
                 |> Seq.map (fun infoSetKey ->
                     let strategy =
-                        (StrategyModel.getStrategy infoSetKey stratModel)
+                        (StrategyModel.getStrategy
+                            settings.Device infoSetKey stratModel)
                             .data<float32>()
                             .ToArray()
                     infoSetKey, strategy)

@@ -37,6 +37,9 @@ module Settings =
             /// Number of strategy samples to keep.
             NumStrategySamples = 1_000_000
 
+            /// Device to train on.
+            Device = "cuda"
+
             /// Tensorboard writer.
             Writer =
                 let timespan = DateTime.Now - DateTime.Today

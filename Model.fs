@@ -47,7 +47,7 @@ type AdvantageModel =
 module AdvantageModel =
 
     /// Creates an advantage model.
-    let create hiddenSize learningRate =
+    let create device hiddenSize learningRate =
         let network =
             Sequential(
                 Linear(Network.inputSize, hiddenSize),
@@ -55,6 +55,7 @@ module AdvantageModel =
                 Linear(hiddenSize, hiddenSize),
                 ReLU(),
                 Linear(hiddenSize, Network.outputSize))
+                .``to``(device : string)
         {
             Network = network
             Optimizer =
@@ -65,38 +66,42 @@ module AdvantageModel =
         }
 
     /// Gets the advantage for the given info set.
-    let getAdvantage infoSetKey model =
+    let getAdvantage device infoSetKey model =
         (infoSetKey
             |> KuhnPoker.Encoding.encodeInput
             |> torch.tensor)
+            .``to``(device : string)
             --> model.Network
 
     /// Trains the given model using the given samples.
-    let train numSteps samples model =
+    let train device numSteps samples model =
 
             // prepare training data
         let inputs =
-            samples
+            (samples
                 |> Seq.map (fun sample ->
                     sample.InfoSetKey
                         |> KuhnPoker.Encoding.encodeInput)
                 |> array2D
-                |> torch.tensor
+                |> torch.tensor)
+                .``to``(device : string)
         let targets =
-            samples
+            (samples
                 |> Seq.map (fun sample ->
                     sample.Regrets)
                 |> array2D
-                |> torch.tensor
+                |> torch.tensor)
+                .``to``(device)
         let iters =
-            samples
+            (samples
                 |> Seq.map (fun sample ->
                     (sample.Iteration + 1)   // make 1-based
                         |> float32
                         |> sqrt
                         |> Seq.singleton )
                 |> array2D
-                |> torch.tensor
+                |> torch.tensor)
+                .``to``(device)
 
         [|
             for _ = 1 to numSteps do
@@ -143,7 +148,7 @@ type StrategyModel =
 module StrategyModel =
 
     /// Creates a strategy model.
-    let create hiddenSize learningRate =
+    let create device hiddenSize learningRate =
         let network =
             Sequential(
                 Linear(Network.inputSize, hiddenSize),
@@ -151,6 +156,7 @@ module StrategyModel =
                 Linear(hiddenSize, hiddenSize),
                 ReLU(),
                 Linear(hiddenSize, Network.outputSize))
+                .``to``(device : string)
         {
             Network = network
             Optimizer =
@@ -162,31 +168,34 @@ module StrategyModel =
         }
 
     /// Trains the given model using the given samples.
-    let train numSteps samples model =
+    let train device numSteps samples model =
 
             // prepare training data
         let inputs =
-            samples
+            (samples
                 |> Seq.map (fun sample ->
                     sample.InfoSetKey
                         |> KuhnPoker.Encoding.encodeInput)
                 |> array2D
-                |> torch.tensor
+                |> torch.tensor)
+                .``to``(device : string)
         let targets =
-            samples
+            (samples
                 |> Seq.map (fun sample ->
                     sample.Strategy)
                 |> array2D
-                |> torch.tensor
+                |> torch.tensor)
+                .``to``(device)
         let iters =
-            samples
+            (samples
                 |> Seq.map (fun sample ->
                     (sample.Iteration + 1)   // make 1-based
                         |> float32
                         |> sqrt
                         |> Seq.singleton )
                 |> array2D
-                |> torch.tensor
+                |> torch.tensor)
+                .``to``(device)
 
         [|
             for _ = 1 to numSteps do
@@ -209,9 +218,10 @@ module StrategyModel =
         |]
 
     /// Gets the strategy for the given info set.
-    let getStrategy infoSetKey model =
+    let getStrategy device infoSetKey model =
         (infoSetKey
             |> KuhnPoker.Encoding.encodeInput
             |> torch.tensor)
+            .``to``(device : string)
             --> model.Network
             |> model.Softmax.forward
