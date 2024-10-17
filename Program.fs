@@ -4,22 +4,22 @@ open System
 
 module Program =
 
-    let private playerInfoSetKeys =
+    let private infoSetKeys =
         [|
-            [| "J"; "Q"; "K"; "Jcb"; "Qcb"; "Kcb" |]
-            [| "Jb"; "Jc"; "Qb"; "Qc"; "Kb"; "Kc" |]
+            "J"; "Q"; "K"; "Jcb"; "Qcb"; "Kcb"   // player 0
+            "Jb"; "Jc"; "Qb"; "Qc"; "Kb"; "Kc"   // player 1
         |]
 
     let run () =
 
-            // train
+            // train the model
         printfn "Running Kuhn Poker Deep CFR for %A iterations"
             settings.NumIterations
         let stratModel = Trainer.train ()
 
+            // examine resulting strategy
         let strategyMap =
-            playerInfoSetKeys
-                |> Seq.concat 
+            infoSetKeys
                 |> Seq.map (fun infoSetKey ->
                     let strategy =
                         (StrategyModel.getStrategy infoSetKey stratModel)
@@ -27,25 +27,26 @@ module Program =
                             .ToArray()
                     infoSetKey, strategy)
                 |> Map
-
         let betIdx = Array.IndexOf(KuhnPoker.actions, "b")
-        let alpha = strategyMap["J"][betIdx]
+        let lookup infoSetKey =
+            strategyMap[infoSetKey][betIdx]
+        let alpha = lookup "J"
         printfn ""
         printfn "Player 0"
         printfn "   J   bet: %.3f (should be between 0 and 1/3)" alpha
-        printfn "   Q   bet: %.3f (should be 0)" (strategyMap["Q"][betIdx])
-        printfn "   K   bet: %.3f (should be %.3f)" (strategyMap["K"][betIdx]) (3f * alpha)
-        printfn "   Jcb bet: %.3f (should be 0)" (strategyMap["Jcb"][betIdx])
-        printfn "   Qcb bet: %.3f (should be %.3f)" (strategyMap["Qcb"][betIdx]) (alpha + 1.f/3.f)
-        printfn "   Kcb bet: %.3f (should be 1)" (strategyMap["Kcb"][betIdx])
+        printfn "   Q   bet: %.3f (should be 0)" (lookup "Q")
+        printfn "   K   bet: %.3f (should be %.3f)" (lookup "K") (3f * alpha)
+        printfn "   Jcb bet: %.3f (should be 0)" (lookup "Jcb")
+        printfn "   Qcb bet: %.3f (should be %.3f)" (lookup "Qcb") (alpha + 1.f/3.f)
+        printfn "   Kcb bet: %.3f (should be 1)" (lookup "Kcb")
         printfn ""
         printfn "Player 1"
-        printfn "   Jb  bet: %.3f (should be 0)" (strategyMap["Jb"][betIdx])
-        printfn "   Jc  bet: %.3f (should be 1/3)" (strategyMap["Jc"][betIdx])
-        printfn "   Qb  bet: %.3f (should be 1/3)" (strategyMap["Qb"][betIdx])
-        printfn "   Qc  bet: %.3f (should be 0)" (strategyMap["Qc"][betIdx])
-        printfn "   Kb  bet: %.3f (should be 1)" (strategyMap["Kb"][betIdx])
-        printfn "   Kc  bet: %.3f (should be 1)" (strategyMap["Kc"][betIdx])
+        printfn "   Jb  bet: %.3f (should be 0)" (lookup "Jb")
+        printfn "   Jc  bet: %.3f (should be 1/3)" (lookup "Jc")
+        printfn "   Qb  bet: %.3f (should be 1/3)" (lookup "Qb")
+        printfn "   Qc  bet: %.3f (should be 0)" (lookup "Qc")
+        printfn "   Kb  bet: %.3f (should be 1)" (lookup "Kb")
+        printfn "   Kc  bet: %.3f (should be 1)" (lookup "Kc")
 
         strategyMap
 
@@ -68,4 +69,5 @@ module Program =
     let strategyMap = run ()
     printfn ""
     printfn $"Elapsed time: {timer}"
+    printfn ""
     printfn $"Average payoff: {runTournament strategyMap}"
