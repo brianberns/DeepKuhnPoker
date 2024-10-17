@@ -172,7 +172,7 @@ module Trainer =
         resvMap, Seq.concat stratSampleSeqs
 
     /// Trains a strategy model using the given samples.
-    let private trainStrategyModel (resv : Reservoir<StrategySample>) =
+    let private trainStrategyModel (resv : Reservoir<_>) =
         let model =
             StrategyModel.create
                 settings.HiddenSize
