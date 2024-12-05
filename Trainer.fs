@@ -154,7 +154,7 @@ module Trainer =
     let private trainIteration iter stateMap =
 
             // train each player's model
-        let stratSampleSeqs, resvMap =
+        let stratSampleSeqs, stateMap =
             (stateMap, seq { 0 .. KuhnPoker.numPlayers - 1 })
                 ||> Seq.mapFold (fun stateMap updatingPlayer ->
 
@@ -196,7 +196,7 @@ module Trainer =
                 betProb,
                 iter)
 
-        resvMap, Seq.concat stratSampleSeqs
+        stateMap, Seq.concat stratSampleSeqs
 
     /// Trains a strategy model using the given samples.
     let private trainStrategyModel (resv : Reservoir<_>) =
