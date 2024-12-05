@@ -233,7 +233,7 @@ module Trainer =
             let iterNums = seq { 0 .. settings.NumIterations - 1 }
             ((advStateMap, stratResv), iterNums)
                 ||> Seq.fold (fun (advStateMap, stratResv) iter ->
-                    let advResvMap, stratSamples =
+                    let advStateMap, stratSamples =
                         trainIteration iter advStateMap
                     let stratResv =
                         Reservoir.addMany stratSamples stratResv
@@ -241,7 +241,7 @@ module Trainer =
                         $"strategy reservoir",
                         float32 stratResv.Items.Count,
                         iter)
-                    advResvMap, stratResv)
+                    advStateMap, stratResv)
 
             // train the final strategy model
         trainStrategyModel stratResv
